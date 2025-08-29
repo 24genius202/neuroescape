@@ -14,33 +14,53 @@ import android.media.MediaPlayer
 import android.util.Log
 
 object VoiceGuide {
+    private var isrunning: Boolean = false
 
-    fun voiceguide(context: Context, id: Int){
-        val resId: Int
-        val instresId: Int = R.raw.handleinstruction
-        when(id){
-            1 -> resId = R.raw.fence
-            2 -> resId = R.raw.roundhandle
-            3 -> resId = R.raw.leverhandle
-            4 -> resId = R.raw.pushbarhandle
+    fun isrunning(): Boolean{return isrunning}
+
+    fun voiceguide(context: Context, id: Int) {
+        if (isrunning) return
+
+        val instresId = R.raw.handleinstruction
+        val resIds = when (id) {
+            1 -> listOf(R.raw.fence)
+            2 -> listOf(R.raw.roundhandle, instresId)
+            3 -> listOf(R.raw.leverhandle, instresId)
+            4 -> listOf(R.raw.pushbarhandle, instresId)
             else -> return
         }
 
-        playMp3(context, resId)
-
-        //손잡이 안내는 지시문도 실행
-        if(id>1 && id<5){
-            playMp3(context, instresId)
-        }
+        playMp3Queue(context, resIds)
     }
 
     private fun playMp3(context: Context, resId: Int) {
+        isrunning = true
         val mediaPlayer = MediaPlayer.create(context, resId)
         mediaPlayer.start() // 재생 시작
 
         // 재생 완료 후 MediaPlayer 해제
         mediaPlayer.setOnCompletionListener {
+            CoroutineScope(Dispatchers.Main).launch {
+                //delay(2000)  // 2초 대기
+                //isrunning = false
+                it.release()
+            }
+        }
+    }
+
+    private fun playMp3Queue(context: Context, resIds: List<Int>) {
+        if (resIds.isEmpty()) {
+            isrunning = false
+            return
+        }
+
+        isrunning = true
+        val mediaPlayer = MediaPlayer.create(context, resIds.first())
+        mediaPlayer.start()
+
+        mediaPlayer.setOnCompletionListener {
             it.release()
+            playMp3Queue(context, resIds.drop(1)) // 다음 파일 이어서 재생
         }
     }
 
@@ -56,7 +76,7 @@ object VibrationGuide {
         var funx0 = (1.0 / (1.0 + exp(9.19 * (x0 - 0.5)))).toFloat()
         //if(funx0 < 0.05) funx0 = 0.0
 
-        var funx1 = (1.0 / (1.0 + exp(9.19 * (x1 - 0.5)))).toFloat()
+        var funx1 = (1.0 / (1.0 + exp(9.19 * (x1 - 0.5))) * 10).toFloat()
         //if(funx1 < 0.05) funx1 = 0.0
 
         vib_amp = funx1
@@ -66,7 +86,7 @@ object VibrationGuide {
 
         intervalMs = 1000L - (vib_freq * 1000).toLong()
         // 1 ~ 255
-        amplitude = 100 //((vib_amp * 255).toInt()).coerceIn(1, 255)
+        amplitude = ((vib_amp * 255 + 120).toInt()).coerceIn(120, 255)
 
         Log.d("DEBUGLOG", "[UserGuide]updatevibrator | intervalMs: $intervalMs amplitude: $amplitude")
 
@@ -90,13 +110,12 @@ object VibrationGuide {
             vibrate(context.applicationContext, intervalMs / 2, amplitude)
         }
     }
-
-
 }
 
 
 object LocalTimer {
     private var job: Job? = null
+    var activate: Boolean = false
 
     @Volatile
     var intervalMs: Long = 1000L // 실행 중에도 바꿀 수 있음
@@ -106,7 +125,7 @@ object LocalTimer {
         intervalMs = initialIntervalMs
         job = scope.launch(Dispatchers.Default) {
             while (isActive) {
-                task()
+                if(activate) task()
                 delay(intervalMs.coerceAtLeast(1L))
             }
         }

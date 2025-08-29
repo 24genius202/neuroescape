@@ -26,6 +26,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private lateinit var cameraFrameProvider: CameraFrameProvider
     private lateinit var tfrunner: TfliteRunner
+    private var exittimeout: Int = 0
 
 
 
@@ -92,6 +93,13 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun checkexit(result: List<Detection>): Boolean{
+        for(i in result){
+            if(i.classId == 3) return true
+        }
+        return false
+    }
+
     private fun maincode(): Boolean {
         Log.d("DEBUGLOG", "[MainActivity]maincode")
 
@@ -111,6 +119,12 @@ class MainActivity : AppCompatActivity() {
         }
         Log.d("DEBUGLOG", "[MainActivity]"+result.toString())
 
+        //티임아웃 확인
+        if(!checkexit(result)) exittimeout++
+        else exittimeout = 0
+        //진동안내 중단
+        if(exittimeout == 2) LocalTimer.activate = false
+
         for(i in result){
             Log.d("DEBUGLOG", "[MainActivity]" + " ㄴ " + i.toString())
             //언패킹 작업
@@ -129,8 +143,6 @@ class MainActivity : AppCompatActivity() {
 
             val context: Context = this
 
-            //if(classid != 3) VibrationGuide.updatevibrator(0f, 100F)
-
             when(classid){
                 //진동 안내 실행
 
@@ -139,25 +151,31 @@ class MainActivity : AppCompatActivity() {
                     //.let { BigDecimal(it.toDouble()).setScale(6, RoundingMode.HALF_UP).toFloat() }
                     Log.d("DEBUGLOG", "[MainActivity] referencepos:$referencepos")
                     //referencepos 정상적으로 나옴
-                    VibrationGuide.updatevibrator(referencepos, 100F)}
+                    //진동안내 재개
+                    LocalTimer.activate = true
+                    VibrationGuide.updatevibrator(referencepos, checkdistance(w, h))}
                 // 손잡이
                 0 -> { lifecycleScope.launch(Dispatchers.Default) {
-                    VoiceGuide.voiceguide(context, 2)
+                    if(!VoiceGuide.isrunning()) VoiceGuide.voiceguide(context, 2)
                 }}
                 1 -> { lifecycleScope.launch(Dispatchers.Default) {
-                    VoiceGuide.voiceguide(context, 3)
+                    if(!VoiceGuide.isrunning()) VoiceGuide.voiceguide(context, 3)
                 }}
                 2 -> { lifecycleScope.launch(Dispatchers.Default) {
-                    VoiceGuide.voiceguide(context, 4)
+                    if(!VoiceGuide.isrunning()) VoiceGuide.voiceguide(context, 4)
                 }}
                 // 난간
                 5 -> { lifecycleScope.launch(Dispatchers.Default) {
-                    VoiceGuide.voiceguide(context, 1)
+                    if(!VoiceGuide.isrunning()) VoiceGuide.voiceguide(context, 1)
                 }}
             }
         }
 
         return true
+    }
+
+    private fun checkdistance(w: Int, h: Int): Float{
+        return (w*h / 640*640).toFloat()
     }
 
     private fun checkPermission(): Boolean {
