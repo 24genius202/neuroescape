@@ -21,7 +21,8 @@ object TfliteRunner : ImageAnalysis.Analyzer {
     private var modelInputWidth: Int = 0
     private var modelInputHeight: Int = 0
     private var modelInputMax: Int = 0
-
+    private var inputbitmap: Bitmap = Bitmap.createBitmap(640, 480, Bitmap.Config.ARGB_8888)
+    private var inputbitmapsize: Pair<Pair<Int, Int>, Pair<Int, Int>> = Pair(Pair(640, 640), Pair(0,0))
 
 
 
@@ -86,7 +87,15 @@ object TfliteRunner : ImageAnalysis.Analyzer {
         val bitmap = image.toBitmap()
         image.close() // 변환 후 바로 close
 
-        bitmap.let {
+        //비트맵 변환 -> Rotate -> Crop -> letterbox
+
+        val preprocess = deleteBlack(rotateCW(bitmap))
+
+        inputbitmapsize = Pair(Pair(preprocess.centerX, preprocess.centerY), Pair(preprocess.width, preprocess.height))
+
+        val newbitmap = preprocess.bitmap
+        inputbitmap = newbitmap
+        newbitmap.let {
             val (paddedBitmap, padding) = letterbox(it, modelInputWidth, modelInputHeight)
             val inputBuffer = convertBitmapToBuffer(paddedBitmap)
 
@@ -96,6 +105,9 @@ object TfliteRunner : ImageAnalysis.Analyzer {
             latestDetections = postProcess(output[0], padding)
         }
     }
+
+    fun getframe(): Bitmap{return inputbitmap}
+    fun getinputsize(): Pair<Pair<Int, Int>, Pair<Int, Int>>{return inputbitmapsize}
 
     private fun nonMaxSuppression(
         detections: List<Detection>,
@@ -197,6 +209,116 @@ object TfliteRunner : ImageAnalysis.Analyzer {
         }
 
         return nonMaxSuppression(detections, iouThreshold)
+    }
+
+    private fun brightnessup(bitmap: Bitmap): Bitmap{
+        val width = bitmap.width
+        val height = bitmap.height
+
+        val newBitmap = bitmap.copy(bitmap.config, true) // 수정 가능한 복사본 생성
+
+        for (y in 0 until height) {
+            for (x in 0 until width) {
+                val pixel = bitmap.getPixel(x, y)
+
+                val alpha = Color.alpha(pixel)
+                val red = (Color.red(pixel) + 30).coerceIn(0, 255)
+                val green = (Color.green(pixel) + 30).coerceIn(0, 255)
+                val blue = (Color.blue(pixel) + 30).coerceIn(0, 255)
+
+                newBitmap.setPixel(x, y, Color.argb(alpha, red, green, blue))
+            }
+        }
+
+        return newBitmap
+    }
+
+    fun rotateCW(bitmap: Bitmap): Bitmap {
+        val matrix = android.graphics.Matrix()
+        matrix.postRotate(90f) // 90도 회전
+
+        return Bitmap.createBitmap(
+            bitmap,
+            0,
+            0,
+            bitmap.width,
+            bitmap.height,
+            matrix,
+            true // 필터링 여부, true면 품질 향상
+        )
+    }
+
+    private fun deleteBlack(bitmap: Bitmap): CroppedBitmapResult {
+        val width = bitmap.width
+        val height = bitmap.height
+        val pixels = IntArray(width * height)
+        bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
+
+        var minX = width
+        var minY = height
+        var maxX = 0
+        var maxY = 0
+
+        // 밝은 픽셀만 선택
+        for (y in 0 until height) {
+            for (x in 0 until width) {
+                val pixel = pixels[y * width + x]
+                val red = Color.red(pixel)
+                val green = Color.green(pixel)
+                val blue = Color.blue(pixel)
+
+                if (red > 50 && green > 50 && blue > 50) {
+                    minX = minOf(minX, x)
+                    minY = minOf(minY, y)
+                    maxX = maxOf(maxX, x)
+                    maxY = maxOf(maxY, y)
+                }
+            }
+        }
+
+        // 선택된 영역이 없는 경우
+        if (minX > maxX || minY > maxY) {
+            return CroppedBitmapResult(
+                Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888),
+                0,
+                0,
+                0,
+                0
+            )
+        }
+
+        // 현재 크기
+        var croppedWidth = maxX - minX + 1
+        var croppedHeight = maxY - minY + 1
+
+        // 가로 < 세로인 경우 → 좌우로 확장해서 최소한 가로 ≥ 세로 맞추기
+        if (croppedWidth < croppedHeight) {
+            val diff = croppedHeight - croppedWidth
+            val expandLeft = diff / 2
+            val expandRight = diff - expandLeft
+
+            minX = maxOf(0, minX - expandLeft)
+            maxX = minOf(width - 1, maxX + expandRight)
+
+            croppedWidth = maxX - minX + 1
+            // height는 그대로
+        }
+
+        // 잘라낸 비트맵 생성
+        val croppedBitmap = Bitmap.createBitmap(croppedWidth, croppedHeight, Bitmap.Config.ARGB_8888)
+
+        for (y in 0 until croppedHeight) {
+            for (x in 0 until croppedWidth) {
+                val color = bitmap.getPixel(minX + x, minY + y)
+                croppedBitmap.setPixel(x, y, color)
+            }
+        }
+
+        // 중앙 좌표 계산 (원본 기준) 픽셀단위
+        val centerX = minX + croppedWidth / 2
+        val centerY = minY + croppedHeight / 2
+
+        return CroppedBitmapResult(croppedBitmap, centerX, centerY, croppedWidth, croppedHeight)
     }
 
     private fun letterbox(bitmap: Bitmap, modelInputWidth: Int, modelInputHeight: Int): Pair<Bitmap, Pair<Float, Float>> {

@@ -4,6 +4,8 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.util.Log
 import android.view.ViewGroup
+import android.widget.ImageView
+import androidx.camera.camera2.interop.Camera2Interop
 import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
@@ -20,43 +22,72 @@ class CameraFrameProvider(
 ) {
     private val cameraExecutor: ExecutorService = Executors.newSingleThreadExecutor()
     private var latestImageProxy: ImageProxy? = null
+    private var camera: Camera? = null
+    private var bitmapsize: Pair<Int, Int> = Pair(640, 640)
 
     @SuppressLint("UnsafeOptInUsageError")
-    fun startCamera() {
+    fun startCamera(imageView: ImageView, imageVeiw2: ImageView) {
         val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
 
         cameraProviderFuture.addListener({
             val cameraProvider = cameraProviderFuture.get()
 
-            val preview = Preview.Builder()
-                .build()
-                .also {
-                    val previewView = previewViewContainer.getChildAt(0) as? androidx.camera.view.PreviewView
-                    if (previewView == null) {
-                        Log.e("CameraFrameProvider", "PreviewView not found as first child.")
-                        return@addListener
-                    }
-                    it.setSurfaceProvider(previewView.surfaceProvider)
-                }
-
-            val imageAnalysis = ImageAnalysis.Builder()
+            // Preview는 생략, 그냥 ImageAnalysis로 처리
+            val imageAnalysisBuilder = ImageAnalysis.Builder()
                 .setTargetResolution(android.util.Size(resolution, resolution))
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                .build()
-                .also {
-                    it.setAnalyzer(cameraExecutor) { imageProxy ->
-                        latestImageProxy?.close()
-                        latestImageProxy = imageProxy
-                        frameListener?.invoke(imageProxy)
+
+            val extender = Camera2Interop.Extender(imageAnalysisBuilder)
+            extender.setCaptureRequestOption(
+                android.hardware.camera2.CaptureRequest.CONTROL_AE_MODE,
+                android.hardware.camera2.CameraMetadata.CONTROL_AE_MODE_OFF
+            )
+            extender.setCaptureRequestOption(
+                android.hardware.camera2.CaptureRequest.SENSOR_SENSITIVITY,
+                500
+            )
+            extender.setCaptureRequestOption(
+                android.hardware.camera2.CaptureRequest.SENSOR_EXPOSURE_TIME,
+                5_000_000L
+            )
+            extender.setCaptureRequestOption(
+                android.hardware.camera2.CaptureRequest.CONTROL_AWB_MODE,
+                android.hardware.camera2.CameraMetadata.CONTROL_AWB_MODE_FLUORESCENT
+            )
+
+            val imageAnalysis = imageAnalysisBuilder.build().also {
+                it.setAnalyzer(cameraExecutor) { imageProxy ->
+                    latestImageProxy?.close()
+                    latestImageProxy = imageProxy
+
+                    // ImageProxy -> Bitmap 변환
+                    val bitmap = imageProxy.toBitmap()
+                    bitmapsize = Pair(bitmap.width, bitmap.height)
+
+                    val bitmap1 = TfliteRunner.getframe()
+
+                    // UI 스레드에서 ImageView 업데이트
+                    (context as? LifecycleOwner)?.let { owner ->
+                        (imageView.context as? android.app.Activity)?.runOnUiThread {
+                            imageView.setImageBitmap(bitmap1)
+                        }
                     }
+
+                    (context as? LifecycleOwner)?.let { owner ->
+                        (imageVeiw2.context as? android.app.Activity)?.runOnUiThread {
+                            imageVeiw2.setImageBitmap(TfliteRunner.rotateCW(bitmap))
+                        }
+                    }
+
+                    frameListener?.invoke(imageProxy)
                 }
+            }
 
             try {
                 cameraProvider.unbindAll()
-                cameraProvider.bindToLifecycle(
+                camera = cameraProvider.bindToLifecycle(
                     lifecycleOwner,
                     CameraSelector.DEFAULT_BACK_CAMERA,
-                    preview,
                     imageAnalysis
                 )
                 Log.d("CameraFrameProvider", "Camera started successfully")
@@ -66,11 +97,17 @@ class CameraFrameProvider(
         }, ContextCompat.getMainExecutor(context))
     }
 
+    fun getbitmapsize(): Pair<Int, Int>{return bitmapsize}
+
     fun shutdown() {
         cameraExecutor.shutdown()
     }
 
     fun getLatestFrame(): ImageProxy? {
         return latestImageProxy
+    }
+
+    fun enableflash(boolean: Boolean){
+        camera?.cameraControl?.enableTorch(boolean)
     }
 }

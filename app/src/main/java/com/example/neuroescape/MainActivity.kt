@@ -3,12 +3,17 @@ package com.example.neuroescape
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
+import android.hardware.camera2.CameraManager
 import android.os.Bundle
 import android.util.Log
 import android.view.ViewGroup
+import android.widget.ImageView
+import android.widget.Switch
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.camera.core.CameraControl
 import androidx.camera.core.ImageProxy
+import androidx.camera.view.CameraController
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.example.neuroescape.databinding.ActivityMainBinding
@@ -49,14 +54,18 @@ class MainActivity : AppCompatActivity() {
         // tflite initialize
         tfrunner = TfliteRunner
         tfrunner.initialize(this)
+
         // layout initialize
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
-        findViewById<TextView>(R.id.VersionView).text = "v1.0"
         // camera initialize
         cameraFrameProvider = CameraFrameProvider(this, binding.previewContainer as ViewGroup, this)
-        cameraFrameProvider.startCamera()
+        cameraFrameProvider.startCamera(findViewById<ImageView>(R.id.camera_image), findViewById<ImageView>(R.id.original_camera_image))
 
+        val flash = findViewById<Switch>(R.id.Flash)
+        binding.Flash.setOnCheckedChangeListener { _, isChecked ->
+            cameraFrameProvider.enableflash(isChecked)
+        }
 
         Log.d("DEBUGLOG", "[MainActivity]Vibration corutine start")
         //진동 안내 시작
@@ -119,13 +128,17 @@ class MainActivity : AppCompatActivity() {
         }
         Log.d("DEBUGLOG", "[MainActivity]"+result.toString())
 
+
+        val postprocessedresult = finalpostprocess(result)
+
+
         //티임아웃 확인
         if(!checkexit(result)) exittimeout++
         else exittimeout = 0
         //진동안내 중단
         if(exittimeout == 2) LocalTimer.activate = false
 
-        for(i in result){
+        for(i in postprocessedresult){
             Log.d("DEBUGLOG", "[MainActivity]" + " ㄴ " + i.toString())
             //언패킹 작업
             val classid: Int = i.classId
@@ -172,6 +185,36 @@ class MainActivity : AppCompatActivity() {
         }
 
         return true
+    }
+
+    private fun finalpostprocess(result: List<Detection>): List<Detection>{
+        val newdetections = mutableListOf<Detection>()
+
+        val originalbitmapwidth = cameraFrameProvider.getbitmapsize().first
+        val croppedbitmapwidth = tfrunner.getinputsize().second.first
+        val croppedbitmapx = tfrunner.getinputsize().first.first
+
+        val croppedbitmapx1 = (croppedbitmapx-croppedbitmapwidth/2).toInt()
+
+        Log.d("DEBUGLOG", "[MainActivity]originalbitmapwidth:$originalbitmapwidth croppedbitmapwidth:$croppedbitmapwidth croppedbitmapx:$croppedbitmapx")
+
+        for(i in result){
+            val absboxx = (i.box.x * 640).toInt()
+            //절대 x 구하기
+            var absolutex: Float
+
+            val bboxabsx = absboxx + croppedbitmapx1
+
+            //절대 위치들을 상대 위치로 변경
+            absolutex = (bboxabsx / originalbitmapwidth).toFloat()
+
+            Log.d("DEBUGLOG", "[MainActivity]bboxabsx:$bboxabsx absolutex:$absolutex")
+
+            val newbox = Box(absolutex, i.box.y, i.box.width, i.box.height)
+
+            newdetections.add(Detection(i.classId, i.confidence, newbox))
+        }
+        return newdetections
     }
 
     private fun checkdistance(w: Int, h: Int): Float{
