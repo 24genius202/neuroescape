@@ -16,30 +16,35 @@
 
         <ImageView
             android:id="@+id/camera_image"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
             android:scaleType="fitCenter" />
 
     </FrameLayout>
 
-    <FrameLayout
-        android:id="@+id/previewContainer1"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1">
-
-        <ImageView
-            android:id="@+id/original_camera_image"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:scaleType="fitCenter" />
-
-    </FrameLayout>
-
-    <Switch
+    <LinearLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Flash"
-        android:id="@+id/Flash"/>
+        android:orientation="horizontal">
+
+        <Switch
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Flash"
+            android:id="@+id/Flash"/>
+
+        <Button
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="원본 파일"
+            android:id="@+id/original"/>
+
+        <Button
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Crop 파일"
+            android:id="@+id/crop"/>
+
+    </LinearLayout>
 
 </LinearLayout>

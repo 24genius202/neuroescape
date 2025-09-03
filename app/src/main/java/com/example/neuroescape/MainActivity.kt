@@ -7,6 +7,7 @@ import android.hardware.camera2.CameraManager
 import android.os.Bundle
 import android.util.Log
 import android.view.ViewGroup
+import android.widget.Button
 import android.widget.ImageView
 import android.widget.Switch
 import android.widget.TextView
@@ -60,7 +61,7 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
         // camera initialize
         cameraFrameProvider = CameraFrameProvider(this, binding.previewContainer as ViewGroup, this)
-        cameraFrameProvider.startCamera(findViewById<ImageView>(R.id.camera_image), findViewById<ImageView>(R.id.original_camera_image))
+        cameraFrameProvider.startCamera(findViewById<ImageView>(R.id.camera_image), findViewById<Button>(R.id.original), findViewById<Button>(R.id.crop))
 
         val flash = findViewById<Switch>(R.id.Flash)
         binding.Flash.setOnCheckedChangeListener { _, isChecked ->
@@ -199,14 +200,14 @@ class MainActivity : AppCompatActivity() {
         Log.d("DEBUGLOG", "[MainActivity]originalbitmapwidth:$originalbitmapwidth croppedbitmapwidth:$croppedbitmapwidth croppedbitmapx:$croppedbitmapx")
 
         for(i in result){
-            val absboxx = (i.box.x * 640).toInt()
+            val absboxx = (i.box.x * croppedbitmapwidth).toInt()
             //절대 x 구하기
             var absolutex: Float
 
             val bboxabsx = absboxx + croppedbitmapx1
 
             //절대 위치들을 상대 위치로 변경
-            absolutex = (bboxabsx / originalbitmapwidth).toFloat()
+            absolutex = bboxabsx / originalbitmapwidth.toFloat()
 
             Log.d("DEBUGLOG", "[MainActivity]bboxabsx:$bboxabsx absolutex:$absolutex")
 

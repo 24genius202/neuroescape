@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.util.Log
 import android.view.ViewGroup
+import android.widget.Button
 import android.widget.ImageView
 import androidx.camera.camera2.interop.Camera2Interop
 import androidx.camera.core.*
@@ -24,10 +25,19 @@ class CameraFrameProvider(
     private var latestImageProxy: ImageProxy? = null
     private var camera: Camera? = null
     private var bitmapsize: Pair<Int, Int> = Pair(640, 640)
+    private var windowtype = false
 
     @SuppressLint("UnsafeOptInUsageError")
-    fun startCamera(imageView: ImageView, imageVeiw2: ImageView) {
+    fun startCamera(imageView: ImageView, originalbutton: Button, cropbutton: Button) {
         val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
+
+        originalbutton.setOnClickListener {
+            windowtype = true
+        }
+
+        cropbutton.setOnClickListener {
+            windowtype = false
+        }
 
         cameraProviderFuture.addListener({
             val cameraProvider = cameraProviderFuture.get()
@@ -67,17 +77,15 @@ class CameraFrameProvider(
                     val bitmap1 = TfliteRunner.getframe()
 
                     // UI 스레드에서 ImageView 업데이트
+
                     (context as? LifecycleOwner)?.let { owner ->
                         (imageView.context as? android.app.Activity)?.runOnUiThread {
-                            imageView.setImageBitmap(bitmap1)
+                            if(windowtype)  imageView.setImageBitmap(bitmap)
+                            else  imageView.setImageBitmap(bitmap1)
                         }
                     }
 
-                    (context as? LifecycleOwner)?.let { owner ->
-                        (imageVeiw2.context as? android.app.Activity)?.runOnUiThread {
-                            imageVeiw2.setImageBitmap(TfliteRunner.rotateCW(bitmap))
-                        }
-                    }
+
 
                     frameListener?.invoke(imageProxy)
                 }
