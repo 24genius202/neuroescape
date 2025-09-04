@@ -24,7 +24,7 @@ class CameraFrameProvider(
     private val cameraExecutor: ExecutorService = Executors.newSingleThreadExecutor()
     private var latestImageProxy: ImageProxy? = null
     private var camera: Camera? = null
-    private var bitmapsize: Pair<Int, Int> = Pair(640, 640)
+    private var bitmapsize: Pair<Int, Int> = Pair(4000, 3000)
     private var windowtype = false
 
     @SuppressLint("UnsafeOptInUsageError")
@@ -80,7 +80,7 @@ class CameraFrameProvider(
 
                     (context as? LifecycleOwner)?.let { owner ->
                         (imageView.context as? android.app.Activity)?.runOnUiThread {
-                            if(windowtype)  imageView.setImageBitmap(bitmap)
+                            if(windowtype) imageView.setImageBitmap(bitmap)
                             else  imageView.setImageBitmap(bitmap1)
                         }
                     }

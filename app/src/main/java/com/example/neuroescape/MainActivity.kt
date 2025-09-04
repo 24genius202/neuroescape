@@ -33,7 +33,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var cameraFrameProvider: CameraFrameProvider
     private lateinit var tfrunner: TfliteRunner
     private var exittimeout: Int = 0
-
+    private var debuginfo: DebugInfo = DebugInfo(0,0,0,0,0f,0,0f)
 
 
     companion object {
@@ -87,18 +87,18 @@ class MainActivity : AppCompatActivity() {
     private fun tflitePolling() {
         Log.d("DEBUGLOG", "[MainActivity]tflitePolling")
         lifecycleScope.launch(Dispatchers.Default) {
+
+            val originwidthveiw = findViewById<TextView>(R.id.originalwidth)
+            val originalheightveiw = findViewById<TextView>(R.id.originalheight)
+            val croppedwidthveiw = findViewById<TextView>(R.id.croppedwidth)
+            val croppedheightview = findViewById<TextView>(R.id.croppedheight)
+
             while (isActive) { // 코루틴이 살아있는 동안 반복
                 val resultDetected = maincode() // AI 처리 (백그라운드)
 
-//                // UI 업데이트가 필요하면 Main 스레드로 전환
-//                if (resultDetected) {
-//                    withContext(Dispatchers.Main) {
-//                        // 예시: 화면에 결과 표시
-//                        binding.resultTextView.text = "물체 발견!"
-//                    }
-//                }
 
-                delay(AI_PROCESS_INTERVAL_MS) // 다음 주기까지 대기
+
+                delay(AI_PROCESS_INTERVAL_MS)
             }
         }
     }
@@ -192,19 +192,26 @@ class MainActivity : AppCompatActivity() {
         val newdetections = mutableListOf<Detection>()
 
         val originalbitmapwidth = cameraFrameProvider.getbitmapsize().first
-        val croppedbitmapwidth = tfrunner.getinputsize().second.first
-        val croppedbitmapx = tfrunner.getinputsize().first.first
+        val croppedbitmapwidth = tfrunner.getinputsize().beforewidth
+        val croppedbitmapx = tfrunner.getinputsize().beforeheight
+
+        val cropscale = tfrunner.getinputsize().scale
 
         val croppedbitmapx1 = (croppedbitmapx-croppedbitmapwidth/2).toInt()
 
         Log.d("DEBUGLOG", "[MainActivity]originalbitmapwidth:$originalbitmapwidth croppedbitmapwidth:$croppedbitmapwidth croppedbitmapx:$croppedbitmapx")
+
+        //crop 기준 픽셀 x 구하기 -> 기존으로 재스케일링 -> 원본 사진에서 픽셀 x 구하기 -> 그걸 상대 위치로 변환
 
         for(i in result){
             val absboxx = (i.box.x * croppedbitmapwidth).toInt()
             //절대 x 구하기
             var absolutex: Float
 
-            val bboxabsx = absboxx + croppedbitmapx1
+            var bboxabsx = absboxx + croppedbitmapx1
+
+            //리스케일링
+            bboxabsx /= cropscale.toInt()
 
             //절대 위치들을 상대 위치로 변경
             absolutex = bboxabsx / originalbitmapwidth.toFloat()
@@ -214,6 +221,8 @@ class MainActivity : AppCompatActivity() {
             val newbox = Box(absolutex, i.box.y, i.box.width, i.box.height)
 
             newdetections.add(Detection(i.classId, i.confidence, newbox))
+
+            debuginfo = DebugInfo(originalbitmapwidth, 0, croppedbitmapwidth, 0, 0f, bboxabsx, absolutex)
         }
         return newdetections
     }

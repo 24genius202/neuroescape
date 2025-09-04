@@ -23,3 +23,21 @@ data class CroppedBitmapResult(
     val width: Int,
     val height: Int
 )
+
+data class InputBitmapSize(
+    val centerX: Int,
+    val centerY: Int,
+    val beforewidth: Int,
+    val beforeheight: Int,
+    val scale: Float
+)
+
+data class DebugInfo(
+    val originalbitmapwidth: Int,
+    val originalbitmapheight: Int,
+    val croppedbitmapwidth: Int,
+    val croppedbitmapheight: Int,
+    val cropscale: Float,
+    val bboxabsx: Int,
+    val absolutex: Float
+)

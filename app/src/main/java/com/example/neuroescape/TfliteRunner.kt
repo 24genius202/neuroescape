@@ -12,6 +12,7 @@ import org.tensorflow.lite.gpu.GpuDelegate
 import java.nio.channels.FileChannel
 import kotlin.math.max
 import kotlin.math.min
+import androidx.core.graphics.scale
 
 val CLASS_NAMES = listOf("Leverhandle", "Pushbarhandle", "Roundhandle", "Exit", "Fire", "Handrail")
 
@@ -22,7 +23,7 @@ object TfliteRunner : ImageAnalysis.Analyzer {
     private var modelInputHeight: Int = 0
     private var modelInputMax: Int = 0
     private var inputbitmap: Bitmap = Bitmap.createBitmap(640, 480, Bitmap.Config.ARGB_8888)
-    private var inputbitmapsize: Pair<Pair<Int, Int>, Pair<Int, Int>> = Pair(Pair(640, 640), Pair(0,0))
+    private var inputbitmapsize: InputBitmapSize = InputBitmapSize(0,0,0,0,1f)
 
 
 
@@ -90,24 +91,25 @@ object TfliteRunner : ImageAnalysis.Analyzer {
         //비트맵 변환 -> Rotate -> Crop -> letterbox
 
         val preprocess = deleteBlack(rotateCW(bitmap))
+        val resizedvalue = resizeTo640(preprocess.bitmap)
 
-        inputbitmapsize = Pair(Pair(preprocess.centerX, preprocess.centerY), Pair(preprocess.width, preprocess.height))
+        inputbitmapsize = InputBitmapSize(preprocess.centerX, preprocess.centerY, preprocess.width, preprocess.height, resizedvalue.second)
 
-        val newbitmap = preprocess.bitmap
+        val newbitmap = resizedvalue.first
         inputbitmap = newbitmap
         newbitmap.let {
-            val (paddedBitmap, padding) = letterbox(it, modelInputWidth, modelInputHeight)
-            val inputBuffer = convertBitmapToBuffer(paddedBitmap)
+            //val (paddedBitmap, padding) = letterbox(it, modelInputWidth, modelInputHeight)
+            val inputBuffer = convertBitmapToBuffer(it)
 
             val output = Array(1) { Array(10) { FloatArray(8400) } }
             interpreter.run(inputBuffer, output)
 
-            latestDetections = postProcess(output[0], padding)
+            latestDetections = postProcess(output[0])
         }
     }
 
     fun getframe(): Bitmap{return inputbitmap}
-    fun getinputsize(): Pair<Pair<Int, Int>, Pair<Int, Int>>{return inputbitmapsize}
+    fun getinputsize(): InputBitmapSize{return inputbitmapsize}
 
     private fun nonMaxSuppression(
         detections: List<Detection>,
@@ -158,7 +160,7 @@ object TfliteRunner : ImageAnalysis.Analyzer {
         return intersectionArea / (boxAArea + boxBArea - intersectionArea)
     }
 
-    private fun postProcess(output: Array<FloatArray>, padding: Pair<Float, Float>): List<Detection> {
+    private fun postProcess(output: Array<FloatArray>): List<Detection> {
         val detections = mutableListOf<Detection>()
         val numPredictions = output[0].size
         val numFeatures = output.size
@@ -186,12 +188,10 @@ object TfliteRunner : ImageAnalysis.Analyzer {
                 val w = pred[2]
                 val h = pred[3]
 
-                val padX = padding.first * modelInputMax
-                val padY = padding.second * modelInputMax
-                val scale = modelInputMax.toFloat() / (modelInputMax - 2 * padX)
+                val scale = modelInputMax.toFloat() / (modelInputMax)
 
-                val scaledX = (x - padX) * scale
-                val scaledY = (y - padY) * scale
+                val scaledX = x * scale
+                val scaledY = y * scale
                 val scaledW = w * scale
                 val scaledH = h * scale
 
@@ -248,6 +248,22 @@ object TfliteRunner : ImageAnalysis.Analyzer {
         )
     }
 
+    private fun resizeTo640(bitmap: Bitmap): Pair<Bitmap, Float> {
+        val targetSize = 640
+
+        val originalWidth = bitmap.width
+        //val originalHeight = bitmap.height
+
+        // 배율 계산
+        val scaleX = targetSize.toFloat() / originalWidth.toFloat()
+        //val scaleY = targetSize.toFloat() / originalHeight.toFloat()
+
+        // 리사이즈
+        val resizedBitmap = bitmap.scale(targetSize, targetSize)
+
+        return Pair(resizedBitmap, scaleX)
+    }
+
     private fun deleteBlack(bitmap: Bitmap): CroppedBitmapResult {
         val width = bitmap.width
         val height = bitmap.height
@@ -280,10 +296,7 @@ object TfliteRunner : ImageAnalysis.Analyzer {
         if (minX > maxX || minY > maxY) {
             return CroppedBitmapResult(
                 Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888),
-                0,
-                0,
-                0,
-                0
+                0, 0, 0, 0
             )
         }
 
@@ -291,22 +304,28 @@ object TfliteRunner : ImageAnalysis.Analyzer {
         var croppedWidth = maxX - minX + 1
         var croppedHeight = maxY - minY + 1
 
-        // 가로 < 세로인 경우 → 좌우로 확장해서 최소한 가로 ≥ 세로 맞추기
-        if (croppedWidth < croppedHeight) {
-            val diff = croppedHeight - croppedWidth
-            val expandLeft = diff / 2
-            val expandRight = diff - expandLeft
+        // 정사각형 변의 길이 결정
+        val maxSide = maxOf(croppedWidth, croppedHeight)
 
-            minX = maxOf(0, minX - expandLeft)
-            maxX = minOf(width - 1, maxX + expandRight)
+        // 부족한 부분 확장
+        val diffX = maxSide - croppedWidth
+        val diffY = maxSide - croppedHeight
 
-            croppedWidth = maxX - minX + 1
-            // height는 그대로
-        }
+        val expandLeft = diffX / 2
+        val expandRight = diffX - expandLeft
+        val expandTop = diffY / 2
+        val expandBottom = diffY - expandTop
 
-        // 잘라낸 비트맵 생성
+        minX = maxOf(0, minX - expandLeft)
+        maxX = minOf(width - 1, maxX + expandRight)
+        minY = maxOf(0, minY - expandTop)
+        maxY = minOf(height - 1, maxY + expandBottom)
+
+        croppedWidth = maxX - minX + 1
+        croppedHeight = maxY - minY + 1
+
+        // 잘라낸 정사각형 비트맵 생성
         val croppedBitmap = Bitmap.createBitmap(croppedWidth, croppedHeight, Bitmap.Config.ARGB_8888)
-
         for (y in 0 until croppedHeight) {
             for (x in 0 until croppedWidth) {
                 val color = bitmap.getPixel(minX + x, minY + y)
@@ -314,7 +333,7 @@ object TfliteRunner : ImageAnalysis.Analyzer {
             }
         }
 
-        // 중앙 좌표 계산 (원본 기준) 픽셀단위
+        // 중앙 좌표 계산 (원본 기준, 픽셀 단위)
         val centerX = minX + croppedWidth / 2
         val centerY = minY + croppedHeight / 2
 
