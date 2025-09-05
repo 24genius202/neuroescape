@@ -5,6 +5,7 @@ import android.graphics.*
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
 import android.util.Log
+import android.view.ViewGroup
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import org.tensorflow.lite.Interpreter
@@ -16,6 +17,7 @@ import androidx.core.graphics.scale
 import androidx.core.graphics.createBitmap
 import androidx.core.graphics.get
 import androidx.core.graphics.set
+import androidx.lifecycle.LifecycleOwner
 
 val CLASS_NAMES = listOf("Leverhandle", "Pushbarhandle", "Roundhandle", "Exit", "Fire", "Handrail")
 
@@ -27,6 +29,7 @@ object TfliteRunner : ImageAnalysis.Analyzer {
     private var modelInputMax: Int = 0
     private var inputbitmap: Bitmap = Bitmap.createBitmap(640, 480, Bitmap.Config.ARGB_8888)
     private var inputbitmapsize: InputBitmapSize = InputBitmapSize(0,0,0,0,1f)
+    private lateinit var cameraframeprovider: CameraFrameProvider
 
 
 
@@ -406,5 +409,51 @@ object TfliteRunner : ImageAnalysis.Analyzer {
 //
 //        return newBitmap
 //    }
+
+
+    //TODO
+    // ##########################################################
+    // 아래 후처리는 TfliteRunner로 이동해서 처리하게 변경 필요
+    // ##########################################################
+    fun finalpostprocess(result: List<Detection>): List<Detection>{
+        val newdetections = mutableListOf<Detection>()
+
+        val originalbitmapwidth = cameraframeprovider.getbitmapsize().first
+        val croppedbitmapwidth = getinputsize().beforewidth
+        val croppedbitmapx = getinputsize().beforeheight
+
+        val cropscale = getinputsize().scale
+
+        val croppedbitmapx1 = (croppedbitmapx-croppedbitmapwidth/2).toInt()
+
+        Log.d("DEBUGLOG", "[MainActivity]originalbitmapwidth:$originalbitmapwidth croppedbitmapwidth:$croppedbitmapwidth croppedbitmapx:$croppedbitmapx")
+
+        //crop 기준 픽셀 x 구하기 -> 기존으로 재스케일링 -> 원본 사진에서 픽셀 x 구하기 -> 그걸 상대 위치로 변환
+
+        for(i in result){
+            val absboxx = (i.box.x * croppedbitmapwidth).toInt()
+            //절대 x 구하기
+            var absolutex: Float
+
+            var bboxabsx = absboxx + croppedbitmapx1
+
+            //리스케일링
+            bboxabsx = (bboxabsx / cropscale).toInt()
+
+            //절대 위치들을 상대 위치로 변경
+            absolutex = bboxabsx / originalbitmapwidth.toFloat()
+
+            Log.d("DEBUGLOG", "[MainActivity]bboxabsx:$bboxabsx absolutex:$absolutex")
+
+            val newbox = Box(absolutex, i.box.y, i.box.width, i.box.height)
+
+            newdetections.add(Detection(i.classId, i.confidence, newbox))
+
+            //debuginfo = DebugInfo(originalbitmapwidth, 0, croppedbitmapwidth, 0, 0f, bboxabsx, absolutex)
+        }
+        return newdetections
+    }
+
+    fun setupcfp(context: Context, perviewcontainer: ViewGroup, lifecycleOwner: LifecycleOwner){ cameraframeprovider = CameraFrameProvider(context, perviewcontainer, lifecycleOwner) }
 
 }
