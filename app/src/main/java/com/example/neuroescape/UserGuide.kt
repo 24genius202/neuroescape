@@ -94,7 +94,7 @@ object VibrationGuide {
 
         Log.d("DEBUGLOG", "[UserGuide]updatevibrator | intervalMs: $intervalMs amplitude: $amplitude")
 
-        LocalTimer.intervalMs = intervalMs
+        VibratorTimer.intervalMs = intervalMs
     }
 
     private fun vibrate(context: Context, durationMs: Long, amplitude: Int) {
@@ -109,7 +109,7 @@ object VibrationGuide {
         amplitude = 100
 
         // 안전하게 Coroutine 시작
-        LocalTimer.start(intervalMs, scope) {
+        VibratorTimer.start(intervalMs, scope) {
             // Activity 종료 시 crash 방지 위해 applicationContext 사용
             vibrate(context.applicationContext, intervalMs / 2, amplitude)
         }
@@ -117,7 +117,7 @@ object VibrationGuide {
 }
 
 
-object LocalTimer {
+object VibratorTimer {
     private var job: Job? = null
     var activate: Boolean = false
 

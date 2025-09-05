@@ -3,18 +3,13 @@ package com.example.neuroescape
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
-import android.hardware.camera2.CameraManager
 import android.os.Bundle
 import android.util.Log
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.ImageView
-import android.widget.Switch
-import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
-import androidx.camera.core.CameraControl
 import androidx.camera.core.ImageProxy
-import androidx.camera.view.CameraController
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.example.neuroescape.databinding.ActivityMainBinding
@@ -24,8 +19,6 @@ import kotlin.math.abs
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import java.math.BigDecimal
-import java.math.RoundingMode
 
 class MainActivity : AppCompatActivity() {
 
@@ -63,18 +56,21 @@ class MainActivity : AppCompatActivity() {
         cameraFrameProvider = CameraFrameProvider(this, binding.previewContainer as ViewGroup, this)
         cameraFrameProvider.startCamera(findViewById<ImageView>(R.id.camera_image), findViewById<Button>(R.id.original), findViewById<Button>(R.id.crop))
 
-        val flash = findViewById<Switch>(R.id.Flash)
+        // set flash event listener
         binding.Flash.setOnCheckedChangeListener { _, isChecked ->
-            cameraFrameProvider.enableflash(isChecked)
+            {
+                Log.d("DEBUGLOG", "flash $isChecked")
+                cameraFrameProvider.enableflash(isChecked)
+            }
         }
 
-        Log.d("DEBUGLOG", "[MainActivity]Vibration corutine start")
+        Log.d("DEBUGLOG", "[MainActivity]Vibration coroutine start")
         //진동 안내 시작
         lifecycleScope.launch(Dispatchers.Default) {
             VibrationGuide.startvibratorguide(this@MainActivity, lifecycleScope)
         }
 
-        Log.d("DEBUGLOG", "[MainActivity]tflite corutine start")
+        Log.d("DEBUGLOG", "[MainActivity]tflite coroutine start")
         // tflite 물체 인식 시작
         lifecycleScope.launch {
             delay(2000) // 2초 대기
@@ -88,15 +84,17 @@ class MainActivity : AppCompatActivity() {
         Log.d("DEBUGLOG", "[MainActivity]tflitePolling")
         lifecycleScope.launch(Dispatchers.Default) {
 
-            val originwidthveiw = findViewById<TextView>(R.id.originalwidth)
-            val originalheightveiw = findViewById<TextView>(R.id.originalheight)
-            val croppedwidthveiw = findViewById<TextView>(R.id.croppedwidth)
-            val croppedheightview = findViewById<TextView>(R.id.croppedheight)
 
             while (isActive) { // 코루틴이 살아있는 동안 반복
                 val resultDetected = maincode() // AI 처리 (백그라운드)
 
-
+//                // UI 업데이트가 필요하면 Main 스레드로 전환
+//                if (resultDetected) {
+//                    withContext(Dispatchers.Main) {
+//                        // 예시: 화면에 결과 표시
+//                        binding.resultTextView.text = "물체 발견!"
+//                    }
+//                }
 
                 delay(AI_PROCESS_INTERVAL_MS)
             }
@@ -122,7 +120,7 @@ class MainActivity : AppCompatActivity() {
 
         //get tflite result
         val result: List<Detection> = try {
-            tfrunner.runcycle(frame, this)
+            tfrunner.runcycle(frame)
         } catch (e: Exception) {
             Log.e("DEBUGLOG", "[MainActivity]TFLite run failed", e)
             return false
@@ -137,7 +135,7 @@ class MainActivity : AppCompatActivity() {
         if(!checkexit(result)) exittimeout++
         else exittimeout = 0
         //진동안내 중단
-        if(exittimeout == 2) LocalTimer.activate = false
+        if(exittimeout == 2) VibratorTimer.activate = false
 
         for(i in postprocessedresult){
             Log.d("DEBUGLOG", "[MainActivity]" + " ㄴ " + i.toString())
@@ -166,7 +164,7 @@ class MainActivity : AppCompatActivity() {
                     Log.d("DEBUGLOG", "[MainActivity] referencepos:$referencepos")
                     //referencepos 정상적으로 나옴
                     //진동안내 재개
-                    LocalTimer.activate = true
+                    VibratorTimer.activate = true
                     VibrationGuide.updatevibrator(referencepos, checkdistance(w, h))}
                 // 손잡이
                 0 -> { lifecycleScope.launch(Dispatchers.Default) {
@@ -188,6 +186,10 @@ class MainActivity : AppCompatActivity() {
         return true
     }
 
+    //TODO
+    // ##########################################################
+    // 아래 후처리는 TfliteRunner로 이동해서 처리하게 변경 필요
+    // ##########################################################
     private fun finalpostprocess(result: List<Detection>): List<Detection>{
         val newdetections = mutableListOf<Detection>()
 
@@ -211,7 +213,7 @@ class MainActivity : AppCompatActivity() {
             var bboxabsx = absboxx + croppedbitmapx1
 
             //리스케일링
-            bboxabsx /= cropscale.toInt()
+            bboxabsx = (bboxabsx / cropscale).toInt()
 
             //절대 위치들을 상대 위치로 변경
             absolutex = bboxabsx / originalbitmapwidth.toFloat()
@@ -228,7 +230,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun checkdistance(w: Int, h: Int): Float{
-        return (w*h / 640*640).toFloat()
+        val distance = (w*h / 640*640).toFloat()
+        Log.d("DEBUGLOG", "[MainActivity] distance:$distance")
+        return distance
     }
 
     private fun checkPermission(): Boolean {

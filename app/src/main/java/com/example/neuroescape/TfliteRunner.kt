@@ -13,6 +13,9 @@ import java.nio.channels.FileChannel
 import kotlin.math.max
 import kotlin.math.min
 import androidx.core.graphics.scale
+import androidx.core.graphics.createBitmap
+import androidx.core.graphics.get
+import androidx.core.graphics.set
 
 val CLASS_NAMES = listOf("Leverhandle", "Pushbarhandle", "Roundhandle", "Exit", "Fire", "Handrail")
 
@@ -76,7 +79,7 @@ object TfliteRunner : ImageAnalysis.Analyzer {
 
     }
 
-    fun runcycle(image: ImageProxy, context: Context): List<Detection> {
+    fun runcycle(image: ImageProxy): List<Detection> {
         Log.d("DEBUGLOG", "[TfliteRunner]runcycle")
         analyze(image)
         return latestDetections
@@ -85,19 +88,24 @@ object TfliteRunner : ImageAnalysis.Analyzer {
     override fun analyze(image: ImageProxy) {
         Log.d("DEBUGLOG", "[TfliteRunner]analyze")
         // Bitmap 변환
-        val bitmap = image.toBitmap()
+        val bitmap = rotateCW(image.toBitmap())
         image.close() // 변환 후 바로 close
 
         //비트맵 변환 -> Rotate -> Crop -> letterbox
 
-        val preprocess = deleteBlack(rotateCW(bitmap))
-        val resizedvalue = resizeTo640(preprocess.bitmap)
+        val preprocess = cropBitmap(bitmap)
+        val resizedvalue = resize(preprocess.bitmap)
 
+        //TODO
+        // ##########################################################
+        // 아래 변수는 MainActivity에서 후처리(finalpostprocess)를 위한 코드인데
+        // MainActivity의 후처리는 TfliteRunner에서 처리하게 변경 필요
+        // ##########################################################
         inputbitmapsize = InputBitmapSize(preprocess.centerX, preprocess.centerY, preprocess.width, preprocess.height, resizedvalue.second)
 
-        val newbitmap = resizedvalue.first
-        inputbitmap = newbitmap
-        newbitmap.let {
+        val croppedBitmap = resizedvalue.first
+        inputbitmap = croppedBitmap
+        croppedBitmap.let {
             //val (paddedBitmap, padding) = letterbox(it, modelInputWidth, modelInputHeight)
             val inputBuffer = convertBitmapToBuffer(it)
 
@@ -108,7 +116,7 @@ object TfliteRunner : ImageAnalysis.Analyzer {
         }
     }
 
-    fun getframe(): Bitmap{return inputbitmap}
+    fun getCropBitmap(): Bitmap{return inputbitmap}
     fun getinputsize(): InputBitmapSize{return inputbitmapsize}
 
     private fun nonMaxSuppression(
@@ -188,20 +196,12 @@ object TfliteRunner : ImageAnalysis.Analyzer {
                 val w = pred[2]
                 val h = pred[3]
 
-                val scale = modelInputMax.toFloat() / (modelInputMax)
-
-                val scaledX = x * scale
-                val scaledY = y * scale
-                val scaledW = w * scale
-                val scaledH = h * scale
-
-
                 //최종 반환 타입
                 val box = Box(
-                    x = scaledX - scaledW / 2,
-                    y = scaledY - scaledH / 2,
-                    width = scaledW,
-                    height = scaledH
+                    x = x - w / 2,
+                    y = y - h / 2,
+                    width = w,
+                    height = h
                 )
 
                 detections.add(Detection(classId, maxScore, box))
@@ -211,30 +211,9 @@ object TfliteRunner : ImageAnalysis.Analyzer {
         return nonMaxSuppression(detections, iouThreshold)
     }
 
-    private fun brightnessup(bitmap: Bitmap): Bitmap{
-        val width = bitmap.width
-        val height = bitmap.height
-
-        val newBitmap = bitmap.copy(bitmap.config, true) // 수정 가능한 복사본 생성
-
-        for (y in 0 until height) {
-            for (x in 0 until width) {
-                val pixel = bitmap.getPixel(x, y)
-
-                val alpha = Color.alpha(pixel)
-                val red = (Color.red(pixel) + 30).coerceIn(0, 255)
-                val green = (Color.green(pixel) + 30).coerceIn(0, 255)
-                val blue = (Color.blue(pixel) + 30).coerceIn(0, 255)
-
-                newBitmap.setPixel(x, y, Color.argb(alpha, red, green, blue))
-            }
-        }
-
-        return newBitmap
-    }
 
     fun rotateCW(bitmap: Bitmap): Bitmap {
-        val matrix = android.graphics.Matrix()
+        val matrix = Matrix()
         matrix.postRotate(90f) // 90도 회전
 
         return Bitmap.createBitmap(
@@ -248,14 +227,18 @@ object TfliteRunner : ImageAnalysis.Analyzer {
         )
     }
 
-    private fun resizeTo640(bitmap: Bitmap): Pair<Bitmap, Float> {
-        val targetSize = 640
+    //TODO
+    // ##########################################################
+    // 개인적으론 cropBitmap 함수와 합치는걸 추천
+    // ##########################################################
+    private fun resize(bitmap: Bitmap): Pair<Bitmap, Float> {
+        val targetSize = modelInputMax
 
         val originalWidth = bitmap.width
         //val originalHeight = bitmap.height
 
         // 배율 계산
-        val scaleX = targetSize.toFloat() / originalWidth.toFloat()
+        val scaleX = targetSize / originalWidth.toFloat()
         //val scaleY = targetSize.toFloat() / originalHeight.toFloat()
 
         // 리사이즈
@@ -264,7 +247,7 @@ object TfliteRunner : ImageAnalysis.Analyzer {
         return Pair(resizedBitmap, scaleX)
     }
 
-    private fun deleteBlack(bitmap: Bitmap): CroppedBitmapResult {
+    private fun cropBitmap(bitmap: Bitmap): CroppedBitmapResult {
         val width = bitmap.width
         val height = bitmap.height
         val pixels = IntArray(width * height)
@@ -283,7 +266,7 @@ object TfliteRunner : ImageAnalysis.Analyzer {
                 val green = Color.green(pixel)
                 val blue = Color.blue(pixel)
 
-                if (red > 50 && green > 50 && blue > 50) {
+                if (red+ green + blue > 150) {
                     minX = minOf(minX, x)
                     minY = minOf(minY, y)
                     maxX = maxOf(maxX, x)
@@ -292,13 +275,21 @@ object TfliteRunner : ImageAnalysis.Analyzer {
             }
         }
 
+        //TODO
+        // ##########################################################
+        // 선택된 영역이 없을 경우
+        // 리턴값을 false로 설정하는 등 조치를 취해서
+        // 이후 연산을 하지 않게 처리
+        // ##########################################################
+
         // 선택된 영역이 없는 경우
         if (minX > maxX || minY > maxY) {
             return CroppedBitmapResult(
-                Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888),
+                createBitmap(1, 1),
                 0, 0, 0, 0
             )
         }
+
 
         // 현재 크기
         var croppedWidth = maxX - minX + 1
@@ -325,13 +316,20 @@ object TfliteRunner : ImageAnalysis.Analyzer {
         croppedHeight = maxY - minY + 1
 
         // 잘라낸 정사각형 비트맵 생성
-        val croppedBitmap = Bitmap.createBitmap(croppedWidth, croppedHeight, Bitmap.Config.ARGB_8888)
+        val croppedBitmap = createBitmap(croppedWidth, croppedHeight)
         for (y in 0 until croppedHeight) {
             for (x in 0 until croppedWidth) {
-                val color = bitmap.getPixel(minX + x, minY + y)
-                croppedBitmap.setPixel(x, y, color)
+                val color = bitmap[minX + x, minY + y]
+                croppedBitmap[x, y] = color
             }
         }
+
+        //TODO
+        // ##########################################################
+        // crop한 비트맵이 원본 이미지를 벗어나면
+        // padding을 해서 정사각형으로 만들어야함
+        // ##########################################################
+
 
         // 중앙 좌표 계산 (원본 기준, 픽셀 단위)
         val centerX = minX + croppedWidth / 2
@@ -386,5 +384,27 @@ object TfliteRunner : ImageAnalysis.Analyzer {
         inputBuffer.rewind()
         return inputBuffer
     }
+
+    //    private fun brightnessup(bitmap: Bitmap): Bitmap{
+//        val width = bitmap.width
+//        val height = bitmap.height
+//
+//        val newBitmap = bitmap.copy(bitmap.config, true) // 수정 가능한 복사본 생성
+//
+//        for (y in 0 until height) {
+//            for (x in 0 until width) {
+//                val pixel = bitmap.getPixel(x, y)
+//
+//                val alpha = Color.alpha(pixel)
+//                val red = (Color.red(pixel) + 30).coerceIn(0, 255)
+//                val green = (Color.green(pixel) + 30).coerceIn(0, 255)
+//                val blue = (Color.blue(pixel) + 30).coerceIn(0, 255)
+//
+//                newBitmap.setPixel(x, y, Color.argb(alpha, red, green, blue))
+//            }
+//        }
+//
+//        return newBitmap
+//    }
 
 }

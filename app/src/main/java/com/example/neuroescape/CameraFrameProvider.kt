@@ -2,6 +2,8 @@ package com.example.neuroescape
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.Matrix
 import android.util.Log
 import android.view.ViewGroup
 import android.widget.Button
@@ -72,15 +74,20 @@ class CameraFrameProvider(
 
                     // ImageProxy -> Bitmap 변환
                     val bitmap = imageProxy.toBitmap()
+                    val matrix = Matrix().apply {
+                        postRotate(imageProxy.imageInfo.rotationDegrees.toFloat())
+                    }
+                    val originalImage = Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+
                     bitmapsize = Pair(bitmap.width, bitmap.height)
 
-                    val bitmap1 = TfliteRunner.getframe()
+                    val bitmap1 = TfliteRunner.getCropBitmap()
 
                     // UI 스레드에서 ImageView 업데이트
 
                     (context as? LifecycleOwner)?.let { owner ->
                         (imageView.context as? android.app.Activity)?.runOnUiThread {
-                            if(windowtype) imageView.setImageBitmap(bitmap)
+                            if(windowtype) imageView.setImageBitmap(originalImage)
                             else  imageView.setImageBitmap(bitmap1)
                         }
                     }
