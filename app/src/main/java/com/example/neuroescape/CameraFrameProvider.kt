@@ -26,7 +26,7 @@ class CameraFrameProvider(
     private val cameraExecutor: ExecutorService = Executors.newSingleThreadExecutor()
     private var latestImageProxy: ImageProxy? = null
     private var camera: Camera? = null
-    private var bitmapsize: Pair<Int, Int> = Pair(4000, 3000)
+    private var bitmapsize: Pair<Int, Int> = Pair(640, 640)
     private var windowtype = false
 
     @SuppressLint("UnsafeOptInUsageError")

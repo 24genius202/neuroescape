@@ -78,8 +78,6 @@ object TfliteRunner : ImageAnalysis.Analyzer {
         modelInputHeight = inputShape[1]
         modelInputMax = max(modelInputWidth, modelInputHeight)
 
-
-
     }
 
     fun runcycle(image: ImageProxy): List<Detection> {
@@ -95,14 +93,15 @@ object TfliteRunner : ImageAnalysis.Analyzer {
         image.close() // 변환 후 바로 close
 
         //비트맵 변환 -> Rotate -> Crop -> letterbox
-
-        val preprocess = cropBitmap(bitmap)
+        val croppedframe = cropBitmap(bitmap)
+        if(!croppedframe.second) return
+        val preprocess = croppedframe.first
         val resizedvalue = resize(preprocess.bitmap)
 
         //TODO
         // ##########################################################
         // 아래 변수는 MainActivity에서 후처리(finalpostprocess)를 위한 코드인데
-        // MainActivity의 후처리는 TfliteRunner에서 처리하게 변경 필요
+        // MainActivity의 후처리는 TfliteRunner에서 처리하게 변경 필요             DONE!!!!
         // ##########################################################
         inputbitmapsize = InputBitmapSize(preprocess.centerX, preprocess.centerY, preprocess.width, preprocess.height, resizedvalue.second)
 
@@ -250,7 +249,7 @@ object TfliteRunner : ImageAnalysis.Analyzer {
         return Pair(resizedBitmap, scaleX)
     }
 
-    private fun cropBitmap(bitmap: Bitmap): CroppedBitmapResult {
+    private fun cropBitmap(bitmap: Bitmap): Pair<CroppedBitmapResult, Boolean> {
         val width = bitmap.width
         val height = bitmap.height
         val pixels = IntArray(width * height)
@@ -281,16 +280,13 @@ object TfliteRunner : ImageAnalysis.Analyzer {
         //TODO
         // ##########################################################
         // 선택된 영역이 없을 경우
-        // 리턴값을 false로 설정하는 등 조치를 취해서
-        // 이후 연산을 하지 않게 처리
+        // 리턴값을 false로 설정하는 등 조치를 취해서        Done!!!
+        // 이후 연산을 하지 않게 처리                     DONE!!!
         // ##########################################################
 
         // 선택된 영역이 없는 경우
         if (minX > maxX || minY > maxY) {
-            return CroppedBitmapResult(
-                createBitmap(1, 1),
-                0, 0, 0, 0
-            )
+            return Pair(CroppedBitmapResult(createBitmap(1, 1), 0, 0, 0, 0), false)
         }
 
 
@@ -310,6 +306,19 @@ object TfliteRunner : ImageAnalysis.Analyzer {
         val expandTop = diffY / 2
         val expandBottom = diffY - expandTop
 
+        var paddingleft = 0
+        var paddingRight = 0
+        var paddingTop = 0
+        var paddingBottom = 0
+
+        //maxY + expandBottom >= height maxX + expandRight >= width minY - expandTop < 0 minX - expandLeft < 0
+
+        //프레임 밖으로 나가는 변에 패딩 얼마나 추가할지 결정
+        if(maxY + expandBottom >= height) paddingBottom = maxY + expandBottom - height //1 더해야 하나?
+        if(maxX + expandRight >= width) paddingRight = maxX + expandRight - width
+        if(minY - expandTop < 0) paddingTop = expandTop - minY
+        if(minX - expandLeft < 0) paddingleft = expandLeft - minX
+
         minX = maxOf(0, minX - expandLeft)
         maxX = minOf(width - 1, maxX + expandRight)
         minY = maxOf(0, minY - expandTop)
@@ -319,18 +328,35 @@ object TfliteRunner : ImageAnalysis.Analyzer {
         croppedHeight = maxY - minY + 1
 
         // 잘라낸 정사각형 비트맵 생성
-        val croppedBitmap = createBitmap(croppedWidth, croppedHeight)
-        for (y in 0 until croppedHeight) {
-            for (x in 0 until croppedWidth) {
-                val color = bitmap[minX + x, minY + y]
-                croppedBitmap[x, y] = color
+        val outWidth = croppedWidth + paddingleft + paddingRight
+        val outHeight = croppedHeight + paddingTop + paddingBottom
+        val croppedBitmap = createBitmap(outWidth, outHeight)
+
+        for (y in 0 until outHeight) {
+            for (x in 0 until outWidth) {
+                // crop 내부 좌표
+                val inCropX = x - paddingleft
+                val inCropY = y - paddingTop
+
+                if (inCropX !in 0 until croppedWidth || inCropY !in 0 until croppedHeight) {
+                    // padding 영역 → 단색 채움
+                    croppedBitmap[x, y] = 0xFF404040.toInt()
+                } else {
+                    // 원본 좌표 매핑
+                    val srcX = minX + inCropX
+                    val srcY = minY + inCropY
+
+                    // 원본 픽셀 가져오기
+                    val color = bitmap[srcX, srcY]
+                    croppedBitmap[x, y] = color
+                }
             }
         }
 
         //TODO
         // ##########################################################
-        // crop한 비트맵이 원본 이미지를 벗어나면
-        // padding을 해서 정사각형으로 만들어야함
+        // crop한 비트맵이 원본 이미지를 벗어나면    DONE!!!
+        // padding을 해서 정사각형으로 만들어야함    DONE!!!
         // ##########################################################
 
 
@@ -338,7 +364,9 @@ object TfliteRunner : ImageAnalysis.Analyzer {
         val centerX = minX + croppedWidth / 2
         val centerY = minY + croppedHeight / 2
 
-        return CroppedBitmapResult(croppedBitmap, centerX, centerY, croppedWidth, croppedHeight)
+        //MainActivity().debuginfo = DebugInfo(MainActivity().debuginfo.originalbitmapwidth, MainActivity().debuginfo.originalbitmapheight, MainActivity().debuginfo.croppedbitmapwidth, 0, bitmap.width, bitmap.height, MainActivity().debuginfo.cropscale, MainActivity().debuginfo.bboxabsx, MainActivity().debuginfo.absolutex) //디버그 아웃풋
+
+        return Pair(CroppedBitmapResult(croppedBitmap, centerX, centerY, croppedWidth, croppedHeight), true)
     }
 
     private fun letterbox(bitmap: Bitmap, modelInputWidth: Int, modelInputHeight: Int): Pair<Bitmap, Pair<Float, Float>> {
@@ -373,10 +401,10 @@ object TfliteRunner : ImageAnalysis.Analyzer {
 
 
     private fun convertBitmapToBuffer(bitmap: Bitmap): ByteBuffer {
-        val inputBuffer = ByteBuffer.allocateDirect(1 * modelInputWidth * modelInputHeight * 3 * 4)
+        val inputBuffer = ByteBuffer.allocateDirect(1 * modelInputMax * modelInputMax * 3 * 4)
         inputBuffer.order(ByteOrder.nativeOrder())
-        val intValues = IntArray(modelInputWidth * modelInputHeight)
-        bitmap.getPixels(intValues, 0, modelInputWidth, 0, 0, modelInputWidth, modelInputHeight)
+        val intValues = IntArray(modelInputMax * modelInputMax)
+        bitmap.getPixels(intValues, 0, modelInputMax, 0, 0, modelInputMax, modelInputMax)
 
 
         for (pixel in intValues) {
@@ -413,7 +441,7 @@ object TfliteRunner : ImageAnalysis.Analyzer {
 
     //TODO
     // ##########################################################
-    // 아래 후처리는 TfliteRunner로 이동해서 처리하게 변경 필요
+    // 아래 후처리는 TfliteRunner로 이동해서 처리하게 변경 필요 DONE!!!
     // ##########################################################
     fun finalpostprocess(result: List<Detection>): List<Detection>{
         val newdetections = mutableListOf<Detection>()
@@ -449,11 +477,13 @@ object TfliteRunner : ImageAnalysis.Analyzer {
 
             newdetections.add(Detection(i.classId, i.confidence, newbox))
 
-            //debuginfo = DebugInfo(originalbitmapwidth, 0, croppedbitmapwidth, 0, 0f, bboxabsx, absolutex)
+            //MainActivity().debuginfo = DebugInfo(originalbitmapwidth, cameraframeprovider.getbitmapsize().second, croppedbitmapwidth, 0, MainActivity().debuginfo.finalW, MainActivity().debuginfo.finalH, 0f, bboxabsx, absolutex) //디버그 아웃풋
         }
         return newdetections
     }
 
+
+    //TfliteRunner에서 cameraframeprovider 선언을 위한 인자 받는 경로. 무조건 코드 시작시(TfliteRunner.runcycle보다 먼저) 실행되어야함
     fun setupcfp(context: Context, perviewcontainer: ViewGroup, lifecycleOwner: LifecycleOwner){ cameraframeprovider = CameraFrameProvider(context, perviewcontainer, lifecycleOwner) }
 
 }

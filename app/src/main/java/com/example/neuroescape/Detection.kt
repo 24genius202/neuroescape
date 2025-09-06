@@ -37,6 +37,8 @@ data class DebugInfo(
     val originalbitmapheight: Int,
     val croppedbitmapwidth: Int,
     val croppedbitmapheight: Int,
+    val finalW: Int,
+    val finalH: Int,
     val cropscale: Float,
     val bboxabsx: Int,
     val absolutex: Float
