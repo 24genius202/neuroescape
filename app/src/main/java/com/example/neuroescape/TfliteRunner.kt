@@ -116,8 +116,7 @@ object TfliteRunner : ImageAnalysis.Analyzer {
 
             val output = Array(1) { Array(10) { FloatArray(8400) } }
             interpreter.run(inputBuffer, output)
-
-            latestDetections = postProcess(output[0])
+            latestDetections = finalpostprocess(postProcess(output[0]))
         }
     }
 

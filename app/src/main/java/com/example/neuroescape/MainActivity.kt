@@ -123,8 +123,6 @@ class MainActivity : AppCompatActivity() {
         Log.d("DEBUGLOG", "[MainActivity]"+result.toString())
 
 
-        val postprocessedresult = tfrunner.finalpostprocess(result)
-
 
         //티임아웃 확인
         if(!checkexit(result)) exittimeout++
@@ -132,7 +130,7 @@ class MainActivity : AppCompatActivity() {
         //진동안내 중단
         if(exittimeout == 2) VibratorTimer.activate = false
 
-        for(i in postprocessedresult){
+        for(i in result){
             Log.d("DEBUGLOG", "[MainActivity]" + " ㄴ " + i.toString())
             //언패킹 작업
             val classid: Int = i.classId
