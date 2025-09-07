@@ -55,7 +55,7 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
         // camera initialize
         cameraFrameProvider = CameraFrameProvider(this, binding.previewContainer as ViewGroup, this)
-        cameraFrameProvider.startCamera(findViewById<ImageView>(R.id.camera_image), findViewById<Button>(R.id.original), findViewById<Button>(R.id.crop))
+        cameraFrameProvider.startCamera(binding.cameraImage, binding.original, binding.crop)
 
         // set flash event listener
         binding.Flash.setOnCheckedChangeListener { _, isChecked ->
@@ -66,8 +66,6 @@ class MainActivity : AppCompatActivity() {
         }
 
 
-
-        tfrunner.setupcfp(this, binding.previewContainer as ViewGroup, this)
 
         Log.d("DEBUGLOG", "[MainActivity]Vibration coroutine start")
         //진동 안내 시작
@@ -89,38 +87,10 @@ class MainActivity : AppCompatActivity() {
         Log.d("DEBUGLOG", "[MainActivity]tflitePolling")
         lifecycleScope.launch(Dispatchers.Default) {
 
-//            withContext(Dispatchers.Main) {
-//                binding.originalwidth = findViewById<TextView>(R.id.originalwidth)
-//                binding.originalheight = findViewById<TextView>(R.id.originalheight)
-//                binding.croppedwidth = findViewById<TextView>(R.id.croppedwidth)
-//                binding.croppedheight = findViewById<TextView>(R.id.croppedheight)
-//                binding.finalwidth = findViewById<TextView>(R.id.finalwidth)
-//                binding.finalheight = findViewById<TextView>(R.id.finalheight)
-//                binding.cropscale = findViewById<TextView>(R.id.cropscale)
-//            }
 
 
             while (isActive) { // 코루틴이 살아있는 동안 반복
-                val resultDetected = maincode() // AI 처리 (백그라운드)
-
-                //디버깅 정보 표시
-
-//                withContext(Dispatchers.Main) {
-//                    // 예시: 화면에 결과 표시
-//                    binding.originalwidth.text = debuginfo.originalbitmapwidth.toString()
-//                    binding.originalheight.text = debuginfo.originalbitmapheight.toString()
-//                    binding.croppedwidth.text = debuginfo.croppedbitmapwidth.toString()
-//                    binding.croppedheight.text = debuginfo.croppedbitmapheight.toString()
-//                    binding.finalwidth.text = debuginfo.finalW.toString()
-//                    binding.finalheight.text = debuginfo.finalH.toString()
-//                    binding.cropscale.text = debuginfo.cropscale.toString()
-//                }
-
-                // UI 업데이트가 필요하면 Main 스레드로 전환
-//                if (resultDetected) {
-//
-//                }
-
+                maincode()
                 delay(AI_PROCESS_INTERVAL_MS)
             }
         }

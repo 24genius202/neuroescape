@@ -29,7 +29,9 @@ object TfliteRunner : ImageAnalysis.Analyzer {
     private var modelInputMax: Int = 0
     private var inputbitmap: Bitmap = Bitmap.createBitmap(640, 480, Bitmap.Config.ARGB_8888)
     private var inputbitmapsize: InputBitmapSize = InputBitmapSize(0,0,0,0,1f)
-    private lateinit var cameraframeprovider: CameraFrameProvider
+
+    // temp variable
+    private lateinit var frameSize: Pair<Int, Int>
 
 
 
@@ -90,6 +92,7 @@ object TfliteRunner : ImageAnalysis.Analyzer {
         Log.d("DEBUGLOG", "[TfliteRunner]analyze")
         // Bitmap 변환
         val bitmap = rotateCW(image.toBitmap())
+        frameSize = Pair(bitmap.width, bitmap.height)
         image.close() // 변환 후 바로 close
 
         //비트맵 변환 -> Rotate -> Crop -> letterbox
@@ -445,8 +448,7 @@ object TfliteRunner : ImageAnalysis.Analyzer {
     // ##########################################################
     fun finalpostprocess(result: List<Detection>): List<Detection>{
         val newdetections = mutableListOf<Detection>()
-
-        val originalbitmapwidth = cameraframeprovider.getbitmapsize().first
+        val originalbitmapwidth = frameSize.first
         val croppedbitmapwidth = getinputsize().beforewidth
         val croppedbitmapx = getinputsize().beforeheight
 
@@ -481,9 +483,5 @@ object TfliteRunner : ImageAnalysis.Analyzer {
         }
         return newdetections
     }
-
-
-    //TfliteRunner에서 cameraframeprovider 선언을 위한 인자 받는 경로. 무조건 코드 시작시(TfliteRunner.runcycle보다 먼저) 실행되어야함
-    fun setupcfp(context: Context, perviewcontainer: ViewGroup, lifecycleOwner: LifecycleOwner){ cameraframeprovider = CameraFrameProvider(context, perviewcontainer, lifecycleOwner) }
 
 }
