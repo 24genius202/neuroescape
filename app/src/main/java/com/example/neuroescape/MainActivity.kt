@@ -33,7 +33,7 @@ class MainActivity : AppCompatActivity() {
     companion object {
         private const val REQUEST_CODE_PERMISSIONS = 10
         private val REQUIRED_PERMISSIONS = arrayOf(Manifest.permission.CAMERA)
-        private const val AI_PROCESS_INTERVAL_MS = 1000L
+        private const val AI_PROCESS_INTERVAL_MS = 100L
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -137,10 +137,10 @@ class MainActivity : AppCompatActivity() {
             val classconfidence: Float = i.confidence
             val box: Box = i.box
 
-            val x = (box.x * 640).toInt()
-            val y = (box.y * 640).toInt()
-            val w = (box.width * 640).toInt()
-            val h = (box.height * 640).toInt()
+            val x = (box.x * cameraFrameProvider.getbitmapsize().first).toInt()
+            val y = (box.y * cameraFrameProvider.getbitmapsize().second).toInt()
+            val w = (box.width * cameraFrameProvider.getbitmapsize().first).toInt()
+            val h = (box.height * cameraFrameProvider.getbitmapsize().second).toInt()
 
             Log.d("DEBUGLOG", "[MainActivity] x:$x y:$y w:$w h:$h")
 
@@ -152,7 +152,7 @@ class MainActivity : AppCompatActivity() {
                 //진동 안내 실행
 
                 //비상구
-                3 -> {referencepos = abs(320 - x.toFloat()) / 640
+                3 -> {referencepos = abs(cameraFrameProvider.getbitmapsize().first/2 - x.toFloat()) / cameraFrameProvider.getbitmapsize().first
                     //.let { BigDecimal(it.toDouble()).setScale(6, RoundingMode.HALF_UP).toFloat() }
                     Log.d("DEBUGLOG", "[MainActivity] referencepos:$referencepos")
                     //referencepos 정상적으로 나옴
@@ -181,7 +181,7 @@ class MainActivity : AppCompatActivity() {
 
 
     private fun checkdistance(w: Int, h: Int): Float{
-        val distance = (w*h / 640*640).toFloat()
+        val distance = (w*h / cameraFrameProvider.getbitmapsize().first*cameraFrameProvider.getbitmapsize().second).toFloat()
         Log.d("DEBUGLOG", "[MainActivity] distance:$distance")
         return distance
     }

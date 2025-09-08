@@ -27,7 +27,7 @@ object TfliteRunner : ImageAnalysis.Analyzer {
     private var modelInputWidth: Int = 0
     private var modelInputHeight: Int = 0
     private var modelInputMax: Int = 0
-    private var inputbitmap: Bitmap = Bitmap.createBitmap(640, 480, Bitmap.Config.ARGB_8888)
+    private var inputbitmap: Bitmap = createBitmap(1,1)
     private var inputbitmapsize: InputBitmapSize = InputBitmapSize(0,0,0,0,1f)
 
     // temp variable
