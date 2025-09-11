@@ -150,7 +150,8 @@ class MainActivity : AppCompatActivity() {
                 3 -> {
                     //진동안내 재개
                     VibratorTimer.activate = true
-                    VibrationGuide.updatevibrator(box.x, box.width*box.height)}
+                    Log.d("DEBUGLOG", "middle x: ${box.x+(box.width/2)}")
+                    VibrationGuide.updatevibrator(box.x+(box.width/2), box.width*box.height)}
                 // 손잡이
                 0 -> { lifecycleScope.launch(Dispatchers.Default) {
                     if(!VoiceGuide.isrunning()) VoiceGuide.voiceguide(context, 2)
