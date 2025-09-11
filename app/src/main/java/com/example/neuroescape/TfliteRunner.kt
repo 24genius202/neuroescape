@@ -206,7 +206,7 @@ object TfliteRunner : ImageAnalysis.Analyzer {
         // 잘라낸 정사각형 비트맵 생성
         val outWidth = croppedWidth + paddingleft + paddingRight
         val outHeight = croppedHeight + paddingTop + paddingBottom
-        val outMax = max(outWidth, outWidth)
+        val outMax = max(outWidth, outHeight)
         val croppedBitmap = createBitmap(outMax, outMax)
 
         for (y in 0 until outHeight) {
@@ -241,7 +241,7 @@ object TfliteRunner : ImageAnalysis.Analyzer {
         val resizedBitmap = croppedBitmap.scale(modelInputMax, modelInputMax)
         Pair(resizedBitmap, scaleX)
 
-        cropBitmapSize = BitmapSize(minX, minY, outMax, outMax, scaleX)
+        cropBitmapSize = BitmapSize(minX-paddingleft, minY-paddingTop, outMax, outMax, scaleX)
 
         return resizedBitmap
     }
@@ -316,6 +316,7 @@ object TfliteRunner : ImageAnalysis.Analyzer {
         //crop 기준 픽셀 x 구하기 -> 기존으로 재스케일링 -> 원본 사진에서 픽셀 x 구하기 -> 그걸 상대 위치로 변환
 
         for(i in result){
+            Log.d("DEBUGLOG", "[TfliteRunner]newbox: $cropBitmapSize")
             val originalPositionX = (i.box.x * cropBitmapSize.beforewidth).toInt() + (cropBitmapSize.X).toInt()
             val originalPositionY = (i.box.y * cropBitmapSize.beforeheight).toInt() + (cropBitmapSize.Y).toInt()
 
