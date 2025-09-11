@@ -115,13 +115,13 @@
         <Button
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="원본 파일"
+            android:text="원본 사진"
             android:id="@+id/original"/>
 
         <Button
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Crop 파일"
+            android:text="detect 사진"
             android:id="@+id/crop"/>
 
     </LinearLayout>

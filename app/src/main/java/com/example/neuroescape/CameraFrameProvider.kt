@@ -15,6 +15,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import androidx.core.graphics.createBitmap
 
 class CameraFrameProvider(
     private val context: Context,
@@ -28,6 +29,8 @@ class CameraFrameProvider(
     private var camera: Camera? = null
     private lateinit var bitmapsize: Pair<Int, Int>
     private var windowtype = false
+
+    private var boxBitmap : Bitmap = createBitmap(1,1)
 
     @SuppressLint("UnsafeOptInUsageError")
     fun startCamera(imageView: ImageView, originalbutton: Button, cropbutton: Button) {
@@ -81,14 +84,13 @@ class CameraFrameProvider(
 
                     bitmapsize = Pair(bitmap.width, bitmap.height)
 
-                    val bitmap1 = TfliteRunner.getCropBitmap()
 
                     // UI 스레드에서 ImageView 업데이트
 
                     (context as? LifecycleOwner)?.let { owner ->
                         (imageView.context as? android.app.Activity)?.runOnUiThread {
                             if(windowtype) imageView.setImageBitmap(originalImage)
-                            else  imageView.setImageBitmap(bitmap1)
+                            else  imageView.setImageBitmap(boxBitmap)
                         }
                     }
 
@@ -124,5 +126,9 @@ class CameraFrameProvider(
 
     fun enableflash(boolean: Boolean){
         camera?.cameraControl?.enableTorch(boolean)
+    }
+
+    fun setBoxBitmap(bitmap: Bitmap) {
+        boxBitmap  = bitmap
     }
 }

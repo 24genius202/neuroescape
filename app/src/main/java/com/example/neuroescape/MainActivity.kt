@@ -3,12 +3,10 @@ package com.example.neuroescape
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
 import android.os.Bundle
 import android.util.Log
 import android.view.ViewGroup
-import android.widget.Button
-import android.widget.ImageView
-import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.ImageProxy
 import androidx.core.app.ActivityCompat
@@ -20,6 +18,11 @@ import kotlin.math.abs
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.RectF
+import android.graphics.Rect
 
 class MainActivity : AppCompatActivity() {
 
@@ -27,8 +30,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var cameraFrameProvider: CameraFrameProvider
     private lateinit var tfrunner: TfliteRunner
     private var exittimeout: Int = 0
-    var debuginfo: DebugInfo = DebugInfo(0,0,0,0, 0, 0,0f,0,0f)
-
 
     companion object {
         private const val REQUEST_CODE_PERMISSIONS = 10
@@ -112,7 +113,6 @@ class MainActivity : AppCompatActivity() {
             Log.d("DEBUGLOG", "[MainActivity]get frame fail")
             return false
         }
-
         //get tflite result
         val result: List<Detection> = try {
             tfrunner.runcycle(frame)
@@ -121,7 +121,7 @@ class MainActivity : AppCompatActivity() {
             return false
         }
         Log.d("DEBUGLOG", "[MainActivity]"+result.toString())
-
+        var boxBitmap: Bitmap = TfliteRunner.getFrameBitmap()
 
 
         //티임아웃 확인
@@ -137,12 +137,7 @@ class MainActivity : AppCompatActivity() {
             val classconfidence: Float = i.confidence
             val box: Box = i.box
 
-            val x = (box.x * cameraFrameProvider.getbitmapsize().first).toInt()
-            val y = (box.y * cameraFrameProvider.getbitmapsize().second).toInt()
-            val w = (box.width * cameraFrameProvider.getbitmapsize().first).toInt()
-            val h = (box.height * cameraFrameProvider.getbitmapsize().second).toInt()
-
-            Log.d("DEBUGLOG", "[MainActivity] x:$x y:$y w:$w h:$h")
+            boxBitmap = drawBoxOnBitmap(boxBitmap, i)
 
             val referencepos: Float
 
@@ -152,13 +147,10 @@ class MainActivity : AppCompatActivity() {
                 //진동 안내 실행
 
                 //비상구
-                3 -> {referencepos = abs(cameraFrameProvider.getbitmapsize().first/2 - x.toFloat()) / cameraFrameProvider.getbitmapsize().first
-                    //.let { BigDecimal(it.toDouble()).setScale(6, RoundingMode.HALF_UP).toFloat() }
-                    Log.d("DEBUGLOG", "[MainActivity] referencepos:$referencepos")
-                    //referencepos 정상적으로 나옴
+                3 -> {
                     //진동안내 재개
                     VibratorTimer.activate = true
-                    VibrationGuide.updatevibrator(referencepos, checkdistance(w, h))}
+                    VibrationGuide.updatevibrator(box.x, box.width*box.height)}
                 // 손잡이
                 0 -> { lifecycleScope.launch(Dispatchers.Default) {
                     if(!VoiceGuide.isrunning()) VoiceGuide.voiceguide(context, 2)
@@ -175,15 +167,70 @@ class MainActivity : AppCompatActivity() {
                 }}
             }
         }
+        cameraFrameProvider.setBoxBitmap(boxBitmap)
 
         return true
     }
 
+    private fun drawBoxOnBitmap(bitmap: Bitmap, detection: Detection) : Bitmap {
+        // 1. 그리기 위한 Canvas 객체 생성
+        val canvas = Canvas(bitmap)
 
-    private fun checkdistance(w: Int, h: Int): Float{
-        val distance = (w*h / cameraFrameProvider.getbitmapsize().first*cameraFrameProvider.getbitmapsize().second).toFloat()
-        Log.d("DEBUGLOG", "[MainActivity] distance:$distance")
-        return distance
+        // 2. TFLite의 정규화된 좌표를 픽셀 단위로 변환
+        val box = detection.box
+        val leftPx = box.x * bitmap.width
+        val topPx = box.y * bitmap.height
+        val rightPx = (box.x + box.width) * bitmap.width
+        val bottomPx = (box.y + box.height) * bitmap.height
+
+        // 3. RectF 객체로 그릴 영역 정의 (픽셀 단위)
+        val rect = RectF(leftPx, topPx, rightPx, bottomPx)
+
+        // 4. Paint 객체 정의
+        val CLASS_NAMES = listOf("Leverhandle", "Pushbarhandle", "Roundhandle", "Exit", "Fire", "Handrail")
+        val colorList = listOf(Color.RED, Color.GREEN, Color.BLUE, Color.CYAN, Color.MAGENTA, Color.YELLOW)
+        val labelColor = colorList[detection.classId]
+
+        val paint = Paint().apply {
+            color = labelColor
+            style = Paint.Style.STROKE // 윤곽선
+            strokeWidth = 5f
+        }
+
+        val labelBackgroundPaint = Paint().apply {
+            color = labelColor
+            style = Paint.Style.FILL // 배경 채우기
+        }
+
+        val labelTextPaint = Paint().apply {
+            color = Color.BLACK // 라벨 텍스트는 검은색으로 설정
+            textSize = 25f // 폰트 크기 조정
+            textAlign = Paint.Align.LEFT
+        }
+
+        // 5. Canvas에 직사각형 그리기
+        canvas.drawRect(rect, paint)
+
+        // 6. 라벨 그리기
+        val label = "${CLASS_NAMES[detection.classId]}: %.2f".format(detection.confidence)
+        val bounds = Rect()
+        labelTextPaint.getTextBounds(label, 0, label.length, bounds)
+
+        // 라벨 배경 사각형의 좌표 계산 (픽셀 단위)
+        val labelRect = RectF(
+            leftPx,
+            topPx - bounds.height().toFloat() - 5f,
+            leftPx + bounds.width().toFloat() + 10f,
+            topPx
+        )
+
+        // 라벨 배경 그리기
+        canvas.drawRect(labelRect, labelBackgroundPaint)
+
+        // 라벨 텍스트 그리기
+        canvas.drawText(label, leftPx + 5f, topPx - 5f, labelTextPaint)
+
+        return bitmap
     }
 
     private fun checkPermission(): Boolean {

@@ -24,9 +24,9 @@ data class CroppedBitmapResult(
     val height: Int
 )
 
-data class InputBitmapSize(
-    val centerX: Int,
-    val centerY: Int,
+data class BitmapSize(
+    val X: Int,
+    val Y: Int,
     val beforewidth: Int,
     val beforeheight: Int,
     val scale: Float
