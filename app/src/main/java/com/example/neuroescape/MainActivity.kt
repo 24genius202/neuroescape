@@ -78,27 +78,27 @@ class MainActivity : AppCompatActivity() {
                 while (isActive) { // 코루틴이 살아있는 동안 반복
                     val result = tfLiteDetect()
                     Log.d("DEBUGLOG", "[MainActivity]"+result.toString())
-                    if (result != null) detectProcess(result)
+                    detectProcess(result)
                     delay(AI_PROCESS_INTERVAL_MS)
                 }
             }
         }
     }
 
-    private fun tfLiteDetect(): List<Detection>? {
+    private fun tfLiteDetect(): List<Detection> {
         Log.d("DEBUGLOG", "[MainActivity]tfLiteDetect")
 
         // get frame
         val frame = cameraFrameProvider.getLatestFrame() ?: run {
             Log.d("DEBUGLOG", "[MainActivity]get frame fail")
-            return null
+            return emptyList<Detection>()
         }
         //get tflite result
         return try {
             tfrunner.runcycle(frame)
         } catch (e: Exception) {
             Log.e("DEBUGLOG", "[MainActivity]TFLite run failed", e)
-            null
+            emptyList<Detection>()
         }
     }
 
