@@ -28,7 +28,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private lateinit var cameraFrameProvider: CameraFrameProvider
     private lateinit var tfrunner: TfliteRunner
-    private var exittimeout: Int = 0
+    private var lastExitDetectedTime: Long = 0
 
     companion object {
         private const val REQUEST_CODE_PERMISSIONS = 10
@@ -84,13 +84,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun checkexit(result: List<Detection>): Boolean{
-        for(i in result){
-            if(i.classId == 3) return true
-        }
-        return false
-    }
-
     private fun tfLiteDetect(): Boolean {
         Log.d("DEBUGLOG", "[MainActivity]maincode")
 
@@ -110,12 +103,16 @@ class MainActivity : AppCompatActivity() {
         Log.d("DEBUGLOG", "[MainActivity]"+result.toString())
         var boxBitmap: Bitmap = TfliteRunner.getFrameBitmap()
 
+        val exitDetected = result.any { it.classId == 3 }
+        val currentTime = System.currentTimeMillis()
 
-        //티임아웃 확인
-        if(!checkexit(result)) exittimeout++
-        else exittimeout = 0
-        //진동안내 중단
-        if(exittimeout == 2) VibratorTimer.activate = false
+        // 비상구 일정시간 탐지 안되면 진동 off
+        if (exitDetected) {
+            lastExitDetectedTime = currentTime
+            VibratorTimer.activate = true
+        } else if (currentTime - lastExitDetectedTime >= 2 * AI_PROCESS_INTERVAL_MS) {
+            VibratorTimer.activate = false
+        }
 
         for(i in result){
             Log.d("DEBUGLOG", "[MainActivity]" + " ㄴ " + i.toString())

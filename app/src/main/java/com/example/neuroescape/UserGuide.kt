@@ -129,7 +129,13 @@ object VibratorTimer {
         intervalMs = initialIntervalMs
         job = scope.launch(Dispatchers.Default) {
             while (isActive) {
-                if(activate) task()
+                if(activate) {
+                    Log.d("DEBUGLOG", "[UserGuide]vibrating")
+                    task()
+                }
+                else {
+                    Log.d("DEBUGLOG", "[UserGuide]not vibrating")
+                }
                 delay(intervalMs.coerceAtLeast(1L))
             }
         }
