@@ -8,7 +8,6 @@ import android.os.Bundle
 import android.util.Log
 import android.view.ViewGroup
 import androidx.appcompat.app.AppCompatActivity
-import androidx.camera.core.ImageProxy
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.example.neuroescape.databinding.ActivityMainBinding
@@ -77,30 +76,34 @@ class MainActivity : AppCompatActivity() {
             delay(2000) // 2초 대기
             lifecycleScope.launch(Dispatchers.Default) {
                 while (isActive) { // 코루틴이 살아있는 동안 반복
-                    tfLiteDetect()
+                    val result = tfLiteDetect()
+                    Log.d("DEBUGLOG", "[MainActivity]"+result.toString())
+                    if (result != null) detectProcess(result)
                     delay(AI_PROCESS_INTERVAL_MS)
                 }
             }
         }
     }
 
-    private fun tfLiteDetect(): Boolean {
-        Log.d("DEBUGLOG", "[MainActivity]maincode")
+    private fun tfLiteDetect(): List<Detection>? {
+        Log.d("DEBUGLOG", "[MainActivity]tfLiteDetect")
 
         // get frame
-        val frame: ImageProxy? = cameraFrameProvider.getLatestFrame()
-        if (frame == null) {
+        val frame = cameraFrameProvider.getLatestFrame() ?: run {
             Log.d("DEBUGLOG", "[MainActivity]get frame fail")
-            return false
+            return null
         }
         //get tflite result
-        val result: List<Detection> = try {
+        return try {
             tfrunner.runcycle(frame)
         } catch (e: Exception) {
             Log.e("DEBUGLOG", "[MainActivity]TFLite run failed", e)
-            return false
+            null
         }
-        Log.d("DEBUGLOG", "[MainActivity]"+result.toString())
+    }
+
+    private fun detectProcess(result: List<Detection>) {
+        Log.d("DEBUGLOG", "[MainActivity]detectProcess")
         var boxBitmap: Bitmap = TfliteRunner.getFrameBitmap()
 
         val exitDetected = result.any { it.classId == 3 }
@@ -118,12 +121,9 @@ class MainActivity : AppCompatActivity() {
             Log.d("DEBUGLOG", "[MainActivity]" + " ㄴ " + i.toString())
             //언패킹 작업
             val classid: Int = i.classId
-            val classconfidence: Float = i.confidence
             val box: Box = i.box
 
             boxBitmap = drawBoxOnBitmap(boxBitmap, i)
-
-            val referencepos: Float
 
             val context: Context = this
 
@@ -153,8 +153,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
         cameraFrameProvider.setBoxBitmap(boxBitmap)
-
-        return true
     }
 
     private fun drawBoxOnBitmap(bitmap: Bitmap, detection: Detection) : Bitmap {
