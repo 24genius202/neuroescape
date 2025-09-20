@@ -13,7 +13,6 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.example.neuroescape.databinding.ActivityMainBinding
 import kotlinx.coroutines.*
-import kotlin.math.abs
 
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
@@ -76,21 +75,11 @@ class MainActivity : AppCompatActivity() {
         // tflite 물체 인식 시작
         lifecycleScope.launch {
             delay(2000) // 2초 대기
-            tflitePolling()
-        }
-    }
-
-
-
-    private fun tflitePolling() {
-        Log.d("DEBUGLOG", "[MainActivity]tflitePolling")
-        lifecycleScope.launch(Dispatchers.Default) {
-
-
-
-            while (isActive) { // 코루틴이 살아있는 동안 반복
-                maincode()
-                delay(AI_PROCESS_INTERVAL_MS)
+            lifecycleScope.launch(Dispatchers.Default) {
+                while (isActive) { // 코루틴이 살아있는 동안 반복
+                    tfLiteDetect()
+                    delay(AI_PROCESS_INTERVAL_MS)
+                }
             }
         }
     }
@@ -102,7 +91,7 @@ class MainActivity : AppCompatActivity() {
         return false
     }
 
-    private fun maincode(): Boolean {
+    private fun tfLiteDetect(): Boolean {
         Log.d("DEBUGLOG", "[MainActivity]maincode")
 
         // get frame
