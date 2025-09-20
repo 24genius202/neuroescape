@@ -60,10 +60,8 @@ class MainActivity : AppCompatActivity() {
 
         // set flash event listener
         binding.Flash.setOnCheckedChangeListener { _, isChecked ->
-            {
-                Log.d("DEBUGLOG", "flash $isChecked")
-                cameraFrameProvider.enableflash(isChecked)
-            }
+            Log.d("DEBUGLOG", "flash $isChecked")
+            cameraFrameProvider.enableflash(isChecked)
         }
 
 
