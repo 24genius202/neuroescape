@@ -86,7 +86,8 @@ object TfliteRunner : ImageAnalysis.Analyzer {
     override fun analyze(image: ImageProxy) {
         Log.d("DEBUGLOG", "[TfliteRunner]analyze")
         // Bitmap 변환
-        val bitmap = rotateCW(image.toBitmap())
+        val rotation = image.imageInfo.rotationDegrees.toFloat()
+        val bitmap = rotateCW(image.toBitmap(), rotation)
         frameBitmap = bitmap
         frameSize = Pair(bitmap.width, bitmap.height)
         image.close() // 변환 후 바로 close
@@ -100,9 +101,9 @@ object TfliteRunner : ImageAnalysis.Analyzer {
             latestDetections = postProcess(output[0])
         }
     }
-    fun rotateCW(bitmap: Bitmap): Bitmap {
+    fun rotateCW(bitmap: Bitmap, rotation: Float): Bitmap {
         val matrix = Matrix()
-        matrix.postRotate(90f) // 90도 회전
+        matrix.postRotate(rotation) // 90도 회전
 
         return Bitmap.createBitmap(
             bitmap,

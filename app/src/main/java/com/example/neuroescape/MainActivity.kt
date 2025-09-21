@@ -6,7 +6,6 @@ import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.os.Bundle
 import android.util.Log
-import android.view.ViewGroup
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -53,7 +52,7 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
         // camera initialize
-        cameraFrameProvider = CameraFrameProvider(this, binding.previewContainer as ViewGroup, this)
+        cameraFrameProvider = CameraFrameProvider(this,this)
         cameraFrameProvider.startCamera(binding.cameraImage, binding.original, binding.crop)
 
         // set flash event listener

@@ -3,10 +3,9 @@ package com.example.neuroescape
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.Matrix
 import android.util.Log
-import android.view.ViewGroup
 import android.widget.Button
+import android.widget.FrameLayout
 import android.widget.ImageView
 import androidx.camera.camera2.interop.Camera2Interop
 import androidx.camera.core.*
@@ -19,52 +18,64 @@ import androidx.core.graphics.createBitmap
 
 class CameraFrameProvider(
     private val context: Context,
-    private val previewViewContainer: ViewGroup,
     private val lifecycleOwner: LifecycleOwner,
-    private val resolution: Int = 640,
     private val frameListener: ((ImageProxy) -> Unit)? = null
 ) {
     private val cameraExecutor: ExecutorService = Executors.newSingleThreadExecutor()
     private var latestImageProxy: ImageProxy? = null
     private var camera: Camera? = null
-    private lateinit var bitmapsize: Pair<Int, Int>
     private var windowtype = false
+    private var isRotate: Boolean = true
 
     private var boxBitmap : Bitmap = createBitmap(1,1)
 
     @SuppressLint("UnsafeOptInUsageError")
     fun startCamera(imageView: ImageView, originalbutton: Button, cropbutton: Button) {
+        Log.d("DEBUGLOG", "[CameraFrameProvider]startCamera")
         val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
 
-        originalbutton.setOnClickListener {
-            windowtype = true
-        }
 
-        cropbutton.setOnClickListener {
-            windowtype = false
-        }
+        val delayMillis = 1000L
+        originalbutton.postDelayed({
+            originalbutton.setOnClickListener {
+                windowtype = true
+            }
+            cropbutton.setOnClickListener {
+                windowtype = false
+            }
+        }, delayMillis)
 
         cameraProviderFuture.addListener({
             val cameraProvider = cameraProviderFuture.get()
 
-            // Preview는 생략, 그냥 ImageAnalysis로 처리
+            // 해상도 설정
+            val displayMetrics = context.resources.displayMetrics
+            val isPortrait = displayMetrics.heightPixels > displayMetrics.widthPixels
+
             val imageAnalysisBuilder = ImageAnalysis.Builder()
-                .setTargetResolution(android.util.Size(resolution, resolution))
+                .setTargetResolution(
+                    if (isPortrait) android.util.Size(1080, 1920)
+                    else android.util.Size(1920, 1080)
+                )
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
 
             val extender = Camera2Interop.Extender(imageAnalysisBuilder)
+            // 자동 노출 끄기
             extender.setCaptureRequestOption(
                 android.hardware.camera2.CaptureRequest.CONTROL_AE_MODE,
                 android.hardware.camera2.CameraMetadata.CONTROL_AE_MODE_OFF
             )
+            // iso값 고정
             extender.setCaptureRequestOption(
                 android.hardware.camera2.CaptureRequest.SENSOR_SENSITIVITY,
                 500
             )
+            // 노출시간 설정
             extender.setCaptureRequestOption(
                 android.hardware.camera2.CaptureRequest.SENSOR_EXPOSURE_TIME,
                 5_000_000L
             )
+            // 형광등 화이트밸런스 적용
             extender.setCaptureRequestOption(
                 android.hardware.camera2.CaptureRequest.CONTROL_AWB_MODE,
                 android.hardware.camera2.CameraMetadata.CONTROL_AWB_MODE_FLUORESCENT
@@ -77,25 +88,73 @@ class CameraFrameProvider(
 
                     // ImageProxy -> Bitmap 변환
                     val bitmap = imageProxy.toBitmap()
-                    val matrix = Matrix().apply {
-                        postRotate(imageProxy.imageInfo.rotationDegrees.toFloat())
-                    }
-                    val originalImage = Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
-
-                    bitmapsize = Pair(bitmap.width, bitmap.height)
-
 
                     // UI 스레드에서 ImageView 업데이트
-
-                    (context as? LifecycleOwner)?.let { owner ->
+                    (context as? LifecycleOwner)?.let {
                         (imageView.context as? android.app.Activity)?.runOnUiThread {
-                            if(windowtype) imageView.setImageBitmap(originalImage)
-                            else  imageView.setImageBitmap(boxBitmap)
+                            imageView.setBackgroundColor(android.graphics.Color.BLACK)
+
+                            val parent = imageView.parent as FrameLayout
+                            val layoutParams = imageView.layoutParams
+
+                            if (windowtype) {
+                                Log.d("DEBUGLOG", "원본")
+                                val rotation = imageProxy.imageInfo.rotationDegrees.toFloat()
+                                if (!isRotate) {
+                                    isRotate = true
+                                    val layoutParams = imageView.layoutParams
+                                    if (rotation == 90f || rotation == 270f) {
+                                        layoutParams.width = parent.height
+                                        layoutParams.height = parent.width
+                                    } else {
+                                        layoutParams.width = parent.width
+                                        layoutParams.height = parent.height
+                                    }
+                                    imageView.layoutParams = layoutParams
+
+                                    imageView.pivotX = 0f
+                                    imageView.pivotY = 0f
+                                    imageView.rotation = rotation
+
+                                    when (rotation) {
+                                        90f -> {
+                                            imageView.translationX = parent.width.toFloat()
+                                            imageView.translationY = 0f
+                                        }
+                                        180f -> {
+                                            imageView.translationX = parent.width.toFloat()
+                                            imageView.translationY = parent.height.toFloat()
+                                        }
+                                        270f -> {
+                                            imageView.translationX = 0f
+                                            imageView.translationY = parent.height.toFloat()
+                                        }
+                                        else -> {
+                                            imageView.translationX = 0f
+                                            imageView.translationY = 0f
+                                        }
+                                    }
+                                }
+                                imageView.setImageBitmap(bitmap)
+
+                            }
+                            else {
+                                Log.d("DEBUGLOG", "디텍")
+                                if (isRotate) {
+                                    // boxBitmap: 회전 적용 X
+                                    layoutParams.width = parent.width
+                                    layoutParams.height = parent.height
+                                    imageView.layoutParams = layoutParams
+
+                                    imageView.rotation = 0f
+                                    imageView.translationX = 0f
+                                    imageView.translationY = 0f
+                                }
+                                imageView.setImageBitmap(boxBitmap)
+                                isRotate = false
+                            }
                         }
                     }
-
-
-
                     frameListener?.invoke(imageProxy)
                 }
             }
@@ -114,7 +173,6 @@ class CameraFrameProvider(
         }, ContextCompat.getMainExecutor(context))
     }
 
-    fun getbitmapsize(): Pair<Int, Int>{return bitmapsize}
 
     fun shutdown() {
         cameraExecutor.shutdown()
