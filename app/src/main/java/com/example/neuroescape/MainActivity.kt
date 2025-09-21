@@ -38,50 +38,64 @@ class MainActivity : AppCompatActivity() {
         Log.d("DEBUGLOG", "[MainActivity]onCreate")
         super.onCreate(savedInstanceState)
 
-        // 권한 체크
-        if (!checkPermission()) {
-            ActivityCompat.requestPermissions(this, REQUIRED_PERMISSIONS, REQUEST_CODE_PERMISSIONS)
-        }
+        // Logo 표시
+        setContentView(R.layout.logo)
 
-        Log.d("DEBUGLOG", "[MainActivity]initialize")
-        // tflite initialize
-        tfrunner = TfliteRunner
-        tfrunner.initialize(this)
-
-        // layout initialize
-        binding = ActivityMainBinding.inflate(layoutInflater)
-        setContentView(binding.root)
-        // camera initialize
-        cameraFrameProvider = CameraFrameProvider(this,this)
-        cameraFrameProvider.startCamera(binding.cameraImage, binding.original, binding.crop)
-
-        // set flash event listener
-        binding.Flash.setOnCheckedChangeListener { _, isChecked ->
-            Log.d("DEBUGLOG", "flash $isChecked")
-            cameraFrameProvider.enableflash(isChecked)
-        }
-
-
-
-        Log.d("DEBUGLOG", "[MainActivity]Vibration coroutine start")
-        //진동 안내 시작
-        lifecycleScope.launch(Dispatchers.Default) {
-            VibrationGuide.startvibratorguide(this@MainActivity, lifecycleScope)
-        }
-
-        Log.d("DEBUGLOG", "[MainActivity]tflite coroutine start")
-        // tflite 물체 인식 시작
         lifecycleScope.launch {
-            delay(2000) // 2초 대기
+            // 로고 2초 표시
+            delay(2000)
+
+            // Main 레이아웃 전환 및 코드 동작
+
+            // layout initialize
+            binding = ActivityMainBinding.inflate(layoutInflater)
+            setContentView(binding.root)
+
+
+            // 권한 체크
+            if (!checkPermission()) {
+                ActivityCompat.requestPermissions(this@MainActivity, REQUIRED_PERMISSIONS, REQUEST_CODE_PERMISSIONS)
+            }
+
+            Log.d("DEBUGLOG", "[MainActivity]initialize")
+            // tflite initialize
+            tfrunner = TfliteRunner
+            tfrunner.initialize(this@MainActivity)
+
+
+            // camera initialize
+            cameraFrameProvider = CameraFrameProvider(this@MainActivity,this@MainActivity)
+            cameraFrameProvider.startCamera(binding.cameraImage, binding.original, binding.crop)
+
+            // set flash event listener
+            binding.Flash.setOnCheckedChangeListener { _, isChecked ->
+                Log.d("DEBUGLOG", "flash $isChecked")
+                cameraFrameProvider.enableflash(isChecked)
+            }
+
+
+            Log.d("DEBUGLOG", "[MainActivity]Vibration coroutine start")
+            //진동 안내 시작
             lifecycleScope.launch(Dispatchers.Default) {
-                while (isActive) { // 코루틴이 살아있는 동안 반복
-                    val result = tfLiteDetect()
-                    Log.d("DEBUGLOG", "[MainActivity]"+result.toString())
-                    detectProcess(result)
-                    delay(AI_PROCESS_INTERVAL_MS)
+                VibrationGuide.startvibratorguide(this@MainActivity, lifecycleScope)
+            }
+
+            Log.d("DEBUGLOG", "[MainActivity]tflite coroutine start")
+            // tflite 물체 인식 시작
+            lifecycleScope.launch {
+                delay(2000) // 2초 대기
+                lifecycleScope.launch(Dispatchers.Default) {
+                    while (isActive) { // 코루틴이 살아있는 동안 반복
+                        val result = tfLiteDetect()
+                        Log.d("DEBUGLOG", "[MainActivity]"+result.toString())
+                        detectProcess(result)
+                        delay(AI_PROCESS_INTERVAL_MS)
+                    }
                 }
             }
         }
+
+
     }
 
     private fun tfLiteDetect(): List<Detection> {
