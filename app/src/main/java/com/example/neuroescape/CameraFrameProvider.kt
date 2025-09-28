@@ -98,7 +98,6 @@ class CameraFrameProvider(
                             val layoutParams = imageView.layoutParams
 
                             if (windowtype) {
-                                Log.d("DEBUGLOG", "원본")
                                 val rotation = imageProxy.imageInfo.rotationDegrees.toFloat()
                                 if (!isRotate) {
                                     isRotate = true
@@ -139,7 +138,6 @@ class CameraFrameProvider(
 
                             }
                             else {
-                                Log.d("DEBUGLOG", "디텍")
                                 if (isRotate) {
                                     // boxBitmap: 회전 적용 X
                                     layoutParams.width = parent.width

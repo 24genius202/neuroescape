@@ -69,7 +69,7 @@ class MainActivity : AppCompatActivity() {
 
             // set flash event listener
             binding.Flash.setOnCheckedChangeListener { _, isChecked ->
-                Log.d("DEBUGLOG", "flash $isChecked")
+                Log.d("DEBUGLOG", "[MainActivity]flash $isChecked")
                 cameraFrameProvider.enableflash(isChecked)
             }
 
@@ -147,7 +147,7 @@ class MainActivity : AppCompatActivity() {
                 3 -> {
                     //진동안내 재개
                     VibratorTimer.activate = true
-                    Log.d("DEBUGLOG", "middle x: ${box.x+(box.width/2)}")
+                    Log.d("DEBUGLOG", "[MainActivity]middle x: ${box.x+(box.width/2)}")
                     VibrationGuide.updatevibrator(box.x+(box.width/2), box.width*box.height)}
                 // 손잡이
                 0 -> { lifecycleScope.launch(Dispatchers.Default) {
