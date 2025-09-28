@@ -13,6 +13,7 @@ import kotlin.math.exp
 import kotlin.math.abs
 import android.media.MediaPlayer
 import android.util.Log
+import kotlin.math.pow
 
 object VoiceGuide {
     private var isrunning: Boolean = false
@@ -78,10 +79,10 @@ object VibrationGuide {
     private var amplitude: Int = 0
 
     fun updatevibrator(x0: Float, x1: Float){
-        var funx0 = (1.0 / (1.0 + exp(9.19 * (abs(x0 - 0.5))))).toFloat()
+        var funx0 = (2.0 / (1.0 + exp(9.19 * (x0 - 0.5).pow(2)))).toFloat()
         //if(funx0 < 0.05) funx0 = 0.0
 
-        var funx1 = (2.0 / (1.0 + exp(9.19 * x1)) ).toFloat()
+        var funx1 = (2.0 / (1.0 + exp(9.19 * x1.pow(2)))).toFloat()
         //if(funx1 < 0.05) funx1 = 0.0
 
         vib_amp = funx1
