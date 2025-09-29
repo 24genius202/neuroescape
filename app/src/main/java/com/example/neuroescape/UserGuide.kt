@@ -27,10 +27,11 @@ object VoiceGuide {
 
         val instresId = R.raw.handleinstruction
         val resIds = when (id) {
-            1 -> listOf(R.raw.fence)
+            0 -> listOf(R.raw.leverhandle, instresId)
+            1 -> listOf(R.raw.pushbarhandle, instresId)
             2 -> listOf(R.raw.roundhandle, instresId)
-            3 -> listOf(R.raw.leverhandle, instresId)
-            4 -> listOf(R.raw.pushbarhandle, instresId)
+            4 -> listOf(R.raw.fire)
+            5 -> listOf(R.raw.fence)
             else -> return
         }
 

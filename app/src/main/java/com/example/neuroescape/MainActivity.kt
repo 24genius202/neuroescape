@@ -149,19 +149,8 @@ class MainActivity : AppCompatActivity() {
                     VibratorTimer.activate = true
                     Log.d("DEBUGLOG", "[MainActivity]middle x: ${box.x+(box.width/2)}")
                     VibrationGuide.updatevibrator(box.x+(box.width/2), box.width*box.height)}
-                // 손잡이
-                0 -> { lifecycleScope.launch(Dispatchers.Default) {
-                    if(!VoiceGuide.isrunning()) VoiceGuide.voiceguide(context, 2)
-                }}
-                1 -> { lifecycleScope.launch(Dispatchers.Default) {
-                    if(!VoiceGuide.isrunning()) VoiceGuide.voiceguide(context, 3)
-                }}
-                2 -> { lifecycleScope.launch(Dispatchers.Default) {
-                    if(!VoiceGuide.isrunning()) VoiceGuide.voiceguide(context, 4)
-                }}
-                // 난간
-                5 -> { lifecycleScope.launch(Dispatchers.Default) {
-                    if(!VoiceGuide.isrunning()) VoiceGuide.voiceguide(context, 1)
+                else -> { lifecycleScope.launch(Dispatchers.Default) {
+                    if(!VoiceGuide.isrunning()) VoiceGuide.voiceguide(context, classid)
                 }}
             }
         }
