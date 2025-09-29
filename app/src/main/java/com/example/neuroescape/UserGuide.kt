@@ -82,7 +82,7 @@ object VibrationGuide {
         var funx0 = (2.0 / (1.0 + exp(9.19 * (x0 - 0.5).pow(2)))).toFloat()
         //if(funx0 < 0.05) funx0 = 0.0
 
-        var funx1 = (2.0 / (1.0 + exp(9.19 * x1.pow(2)))).toFloat()
+        var funx1 = (1 - (2.0 / (1.0 + exp(9.19 * x1.pow(2))))).toFloat()
         //if(funx1 < 0.05) funx1 = 0.0
 
         vib_amp = funx1
