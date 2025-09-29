@@ -90,7 +90,7 @@ object VibrationGuide {
 
         Log.d("DEBUGLOG", "[UserGuide]updatevibrator | vib_freq: $vib_freq vib_amp: $vib_amp")
 
-        intervalMs = 1000L - (vib_freq * 1000).toLong()
+        intervalMs = (1000L - (vib_freq * 1000).toLong()).coerceIn(1, 1000)
         // 1 ~ 255
         amplitude = ((vib_amp * 255 + 120).toInt()).coerceIn(120, 255)
 
