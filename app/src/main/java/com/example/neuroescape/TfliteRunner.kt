@@ -41,7 +41,7 @@ object TfliteRunner : ImageAnalysis.Analyzer {
         Log.d("DEBUGLOG", "[TfliteRunner]initialize")
 
         // load model
-        val modelFile = context.assets.openFd("neuroescape.tflite")
+        val modelFile = context.assets.openFd("last0929_float32.tflite")
         val modelBuffer = modelFile.createInputStream().channel.map(
             FileChannel.MapMode.READ_ONLY,
             modelFile.startOffset,
@@ -288,10 +288,10 @@ object TfliteRunner : ImageAnalysis.Analyzer {
             }
 
             if (maxScore > confidenceThreshold) {
-                val x = pred[0]
-                val y = pred[1]
-                val w = pred[2]
-                val h = pred[3]
+                val x = pred[0] / modelInputWidth
+                val y = pred[1] / modelInputHeight
+                val w = pred[2] / modelInputWidth
+                val h = pred[3] / modelInputHeight
 
                 //최종 반환 타입
                 val box = Box(
