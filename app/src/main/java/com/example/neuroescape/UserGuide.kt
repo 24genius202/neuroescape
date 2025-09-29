@@ -90,7 +90,7 @@ object VibrationGuide {
 
         Log.d("DEBUGLOG", "[UserGuide]updatevibrator | vib_freq: $vib_freq vib_amp: $vib_amp")
 
-        intervalMs = (1000L - (vib_freq * 1000).toLong()).coerceIn(1, 1000)
+        intervalMs = (500L - (vib_freq * 500).toLong()).coerceAtLeast(10L)
         // 1 ~ 255
         amplitude = ((vib_amp * 255 + 120).toInt()).coerceIn(120, 255)
 
@@ -107,13 +107,13 @@ object VibrationGuide {
 
     fun startvibratorguide(context: Context, scope: CoroutineScope){
         // vib_freq 계산 → interval 최소 1ms
-        intervalMs = (1000 - (vib_freq * 1000).toLong()).coerceAtLeast(1L)
+        intervalMs = (500 - (vib_freq * 500).toLong()).coerceAtLeast(10L)
         amplitude = 100
 
         // 안전하게 Coroutine 시작
         VibratorTimer.start(intervalMs, scope) {
             // Activity 종료 시 crash 방지 위해 applicationContext 사용
-            vibrate(context.applicationContext, intervalMs / 2, amplitude)
+            vibrate(context.applicationContext, intervalMs, amplitude)
         }
     }
 }
