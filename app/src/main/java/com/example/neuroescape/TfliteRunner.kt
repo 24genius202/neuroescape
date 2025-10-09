@@ -25,17 +25,11 @@ object TfliteRunner : ImageAnalysis.Analyzer {
     private var modelInputMax: Int = 0
     private var frameBitmap: Bitmap = createBitmap(1,1)
     private var cropBitmapSize: BitmapSize = BitmapSize(0,0,0,0,1f)
-
-    // temp variable
     private lateinit var frameSize: Pair<Int, Int>
-
-
-
-    // private set: getter-> public, setter ->private
     var latestDetections: List<Detection> = emptyList()
-
     private const val confidenceThreshold = 0.5f
     private const val iouThreshold = 0.45f
+
 
     fun initialize(context: Context) {
         Log.d("DEBUGLOG", "[TfliteRunner]initialize")
@@ -74,14 +68,17 @@ object TfliteRunner : ImageAnalysis.Analyzer {
         modelInputWidth = inputShape[2]
         modelInputHeight = inputShape[1]
         modelInputMax = max(modelInputWidth, modelInputHeight)
-
     }
+
+
 
     fun runcycle(image: ImageProxy): List<Detection> {
         Log.d("DEBUGLOG", "[TfliteRunner]runcycle")
         analyze(image)
         return latestDetections
     }
+
+
 
     override fun analyze(image: ImageProxy) {
         Log.d("DEBUGLOG", "[TfliteRunner]analyze")
@@ -101,9 +98,13 @@ object TfliteRunner : ImageAnalysis.Analyzer {
             latestDetections = postProcess(output[0])
         }
     }
+
+
+
     fun rotateCW(bitmap: Bitmap, rotation: Float): Bitmap {
+        Log.d("DEBUGLOG", "[TfliteRunner]rotateCW")
         val matrix = Matrix()
-        matrix.postRotate(rotation) // 90도 회전
+        matrix.postRotate(rotation)
 
         return Bitmap.createBitmap(
             bitmap,
@@ -112,13 +113,21 @@ object TfliteRunner : ImageAnalysis.Analyzer {
             bitmap.width,
             bitmap.height,
             matrix,
-            true // 필터링 여부, true면 품질 향상
+            true
         )
     }
-    fun getFrameBitmap(): Bitmap{return frameBitmap}
+
+
+
+    fun getFrameBitmap(): Bitmap{
+        Log.d("DEBUGLOG", "[TfliteRunner]getFrameBitmap")
+        return frameBitmap
+    }
+
 
 
     private fun calculateIoU(boxA: RectF, boxB: RectF): Float {
+        Log.d("DEBUGLOG", "[TfliteRunner]calculateIoU")
         val intersection = RectF()
         intersection.set(
             max(boxA.left, boxB.left),
@@ -132,7 +141,10 @@ object TfliteRunner : ImageAnalysis.Analyzer {
         return intersectionArea / (boxAArea + boxBArea - intersectionArea)
     }
 
+
+
     private fun cropBitmap(bitmap: Bitmap): Bitmap? {
+        Log.d("DEBUGLOG", "[TfliteRunner]cropBitmap")
         val width = bitmap.width
         val height = bitmap.height
         val pixels = IntArray(width * height)
@@ -160,18 +172,16 @@ object TfliteRunner : ImageAnalysis.Analyzer {
             }
         }
 
-
         // 선택된 영역이 없는 경우
         if (minX > maxX || minY > maxY) {
             return null
         }
 
-
         // 현재 크기
         var croppedWidth = maxX - minX + 1
         var croppedHeight = maxY - minY + 1
 
-        // 정사각형 변의 길이 결정
+        // 정사각형 길이
         val maxSide = maxOf(croppedWidth, croppedHeight)
 
         // 부족한 부분 확장
@@ -188,9 +198,8 @@ object TfliteRunner : ImageAnalysis.Analyzer {
         var paddingTop = 0
         var paddingBottom = 0
 
-        //maxY + expandBottom >= height maxX + expandRight >= width minY - expandTop < 0 minX - expandLeft < 0
 
-        //프레임 밖으로 나가는 변에 패딩 얼마나 추가할지 결정
+        // 프레임 밖으로 나가는 변에 패딩 얼마나 추가할지 결정
         if(maxY + expandBottom >= height) paddingBottom = maxY + expandBottom - height //1 더해야 하나?
         if(maxX + expandRight >= width) paddingRight = maxX + expandRight - width
         if(minY - expandTop < 0) paddingTop = expandTop - minY
@@ -250,6 +259,7 @@ object TfliteRunner : ImageAnalysis.Analyzer {
 
 
     private fun convertBitmapToBuffer(bitmap: Bitmap): ByteBuffer {
+        Log.d("DEBUGLOG", "[TfliteRunner]convertBitmapToBuffer")
         val inputBuffer = ByteBuffer.allocateDirect(1 * modelInputMax * modelInputMax * 3 * 4)
         inputBuffer.order(ByteOrder.nativeOrder())
         val intValues = IntArray(modelInputMax * modelInputMax)
@@ -265,7 +275,10 @@ object TfliteRunner : ImageAnalysis.Analyzer {
         return inputBuffer
     }
 
+
+
     private fun postProcess(output: Array<FloatArray>): List<Detection> {
+        Log.d("DEBUGLOG", "[TfliteRunner]postProcess")
         val detections = mutableListOf<Detection>()
         val numPredictions = output[0].size
         val numFeatures = output.size
@@ -293,7 +306,7 @@ object TfliteRunner : ImageAnalysis.Analyzer {
                 val w = pred[2] / modelInputWidth
                 val h = pred[3] / modelInputHeight
 
-                //최종 반환 타입
+                // 최종 반환 타입
                 val box = Box(
                     x = x - w / 2,
                     y = y - h / 2,
@@ -311,17 +324,16 @@ object TfliteRunner : ImageAnalysis.Analyzer {
         val originalBitmapHeight = frameSize.second
 
 
-
         Log.d("DEBUGLOG", "[TfliteRunner]frame:$frameSize crop:$cropBitmapSize")
 
-        //crop 기준 픽셀 x 구하기 -> 기존으로 재스케일링 -> 원본 사진에서 픽셀 x 구하기 -> 그걸 상대 위치로 변환
+        // crop 기준 픽셀 x 구하기 -> 기존으로 재스케일링 -> 원본 사진에서 픽셀 x 구하기 -> 그걸 상대 위치로 변환
 
         for(i in result){
             Log.d("DEBUGLOG", "[TfliteRunner]newbox: $cropBitmapSize")
             val originalPositionX = (i.box.x * cropBitmapSize.beforewidth).toInt() + (cropBitmapSize.X).toInt()
             val originalPositionY = (i.box.y * cropBitmapSize.beforeheight).toInt() + (cropBitmapSize.Y).toInt()
 
-            //절대 위치들을 상대 위치로 변경
+            // 절대 위치 상대 위치로 변경
             val absoluteX: Float = originalPositionX / originalBitmapWidth.toFloat()
             val absoluteY: Float = originalPositionY / originalBitmapHeight.toFloat()
 
@@ -339,6 +351,7 @@ object TfliteRunner : ImageAnalysis.Analyzer {
         detections: List<Detection>,
         iouThreshold: Float
     ): List<Detection> {
+        Log.d("DEBUGLOG", "[TfliteRunner]nonMaxSuppression")
         val sortedDetections = detections.sortedByDescending { it.confidence }
         val finalDetections = mutableListOf<Detection>()
         val suppressed = BooleanArray(sortedDetections.size) { false }

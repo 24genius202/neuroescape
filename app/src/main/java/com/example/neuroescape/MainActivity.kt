@@ -34,34 +34,37 @@ class MainActivity : AppCompatActivity() {
         private const val AI_PROCESS_INTERVAL_MS = 100L
     }
 
+
+
     override fun onCreate(savedInstanceState: Bundle?) {
         Log.d("DEBUGLOG", "[MainActivity]onCreate")
         super.onCreate(savedInstanceState)
 
         // Logo 표시
+        Log.d("DEBUGLOG", "[MainActivity]show logo")
         setContentView(R.layout.logo)
 
+
         lifecycleScope.launch {
-            // 로고 2초 표시
+            // 로고 출력을 위해 2초 대기
             delay(2000)
 
             // Main 레이아웃 전환 및 코드 동작
+            Log.d("DEBUGLOG", "[MainActivity]MainActivity coroutine start")
 
             // layout initialize
             binding = ActivityMainBinding.inflate(layoutInflater)
             setContentView(binding.root)
-
 
             // 권한 체크
             if (!checkPermission()) {
                 ActivityCompat.requestPermissions(this@MainActivity, REQUIRED_PERMISSIONS, REQUEST_CODE_PERMISSIONS)
             }
 
-            Log.d("DEBUGLOG", "[MainActivity]initialize")
             // tflite initialize
+            Log.d("DEBUGLOG", "[MainActivity]initialize")
             tfrunner = TfliteRunner
             tfrunner.initialize(this@MainActivity)
-
 
             // camera initialize
             cameraFrameProvider = CameraFrameProvider(this@MainActivity,this@MainActivity)
@@ -73,19 +76,18 @@ class MainActivity : AppCompatActivity() {
                 cameraFrameProvider.enableflash(isChecked)
             }
 
-
+            // 진동 안내 시작
             Log.d("DEBUGLOG", "[MainActivity]Vibration coroutine start")
-            //진동 안내 시작
             lifecycleScope.launch(Dispatchers.Default) {
                 VibrationGuide.startvibratorguide(this@MainActivity, lifecycleScope)
             }
 
-            Log.d("DEBUGLOG", "[MainActivity]tflite coroutine start")
             // tflite 물체 인식 시작
+            Log.d("DEBUGLOG", "[MainActivity]tflite coroutine start")
             lifecycleScope.launch {
                 delay(2000) // 2초 대기
                 lifecycleScope.launch(Dispatchers.Default) {
-                    while (isActive) { // 코루틴이 살아있는 동안 반복
+                    while (isActive) {
                         val result = tfLiteDetect()
                         Log.d("DEBUGLOG", "[MainActivity]"+result.toString())
                         detectProcess(result)
@@ -94,9 +96,9 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
-
-
     }
+
+
 
     private fun tfLiteDetect(): List<Detection> {
         Log.d("DEBUGLOG", "[MainActivity]tfLiteDetect")
@@ -115,6 +117,8 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+
+
     private fun detectProcess(result: List<Detection>) {
         Log.d("DEBUGLOG", "[MainActivity]detectProcess")
         var boxBitmap: Bitmap = TfliteRunner.getFrameBitmap()
@@ -132,7 +136,6 @@ class MainActivity : AppCompatActivity() {
 
         for(i in result){
             Log.d("DEBUGLOG", "[MainActivity]" + " ㄴ " + i.toString())
-            //언패킹 작업
             val classid: Int = i.classId
             val box: Box = i.box
 
@@ -140,68 +143,75 @@ class MainActivity : AppCompatActivity() {
 
             val context: Context = this
 
+            // class id 별 동작 수행
             when(classid){
-                //진동 안내 실행
-
                 //비상구
                 3 -> {
-                    //진동안내 재개
+                    // 진동 안내
                     VibratorTimer.activate = true
                     Log.d("DEBUGLOG", "[MainActivity]middle x: ${box.x+(box.width/2)}")
-                    VibrationGuide.updatevibrator(box.x+(box.width/2), box.width*box.height)}
+                    VibrationGuide.updatevibrator(box.x+(box.width/2), box.width*box.height)
+                }
+                // 그 외
                 else -> { lifecycleScope.launch(Dispatchers.Default) {
+                    // 음성 안내
                     if(!VoiceGuide.isrunning()) VoiceGuide.voiceguide(context, classid)
                 }}
             }
         }
+        // boxBitmap 설정
         cameraFrameProvider.setBoxBitmap(boxBitmap)
     }
 
+
+
     private fun drawBoxOnBitmap(bitmap: Bitmap, detection: Detection) : Bitmap {
-        // 1. 그리기 위한 Canvas 객체 생성
+        Log.d("DEBUGLOG", "[MainActivity]drawBoxOnBitmap")
+        // Canvas 객체 생성
         val canvas = Canvas(bitmap)
 
-        // 2. TFLite의 정규화된 좌표를 픽셀 단위로 변환
+        // Paint 객체 정의
+        val CLASS_NAMES = listOf("Leverhandle", "Pushbarhandle", "Roundhandle", "Exit", "Fire", "Handrail")
+        val colorList = listOf(Color.RED, Color.GREEN, Color.BLUE, Color.CYAN, Color.MAGENTA, Color.YELLOW)
+        val labelColor = colorList[detection.classId]
+
+        // TFLite 상대 좌표 -> 픽셀 크기 변환
         val box = detection.box
         val leftPx = box.x * bitmap.width
         val topPx = box.y * bitmap.height
         val rightPx = (box.x + box.width) * bitmap.width
         val bottomPx = (box.y + box.height) * bitmap.height
 
-        // 3. RectF 객체로 그릴 영역 정의 (픽셀 단위)
+        // RectF 사각형 좌표
         val rect = RectF(leftPx, topPx, rightPx, bottomPx)
 
-        // 4. Paint 객체 정의
-        val CLASS_NAMES = listOf("Leverhandle", "Pushbarhandle", "Roundhandle", "Exit", "Fire", "Handrail")
-        val colorList = listOf(Color.RED, Color.GREEN, Color.BLUE, Color.CYAN, Color.MAGENTA, Color.YELLOW)
-        val labelColor = colorList[detection.classId]
-
+        // 물체 사각형 윤곽
         val paint = Paint().apply {
             color = labelColor
-            style = Paint.Style.STROKE // 윤곽선
+            style = Paint.Style.STROKE
             strokeWidth = 5f
         }
 
+        canvas.drawRect(rect, paint)
+
+        // 라벨 배경
         val labelBackgroundPaint = Paint().apply {
             color = labelColor
-            style = Paint.Style.FILL // 배경 채우기
+            style = Paint.Style.FILL
         }
 
+        // 라벨 텍스트
         val labelTextPaint = Paint().apply {
-            color = Color.BLACK // 라벨 텍스트는 검은색으로 설정
-            textSize = 25f // 폰트 크기 조정
+            color = Color.BLACK
+            textSize = 25f
             textAlign = Paint.Align.LEFT
         }
 
-        // 5. Canvas에 직사각형 그리기
-        canvas.drawRect(rect, paint)
-
-        // 6. 라벨 그리기
         val label = "${CLASS_NAMES[detection.classId]}: %.2f".format(detection.confidence)
         val bounds = Rect()
         labelTextPaint.getTextBounds(label, 0, label.length, bounds)
 
-        // 라벨 배경 사각형의 좌표 계산 (픽셀 단위)
+        // 라벨 배경 사각형의 좌표
         val labelRect = RectF(
             leftPx,
             topPx - bounds.height().toFloat() - 5f,
@@ -209,14 +219,13 @@ class MainActivity : AppCompatActivity() {
             topPx
         )
 
-        // 라벨 배경 그리기
         canvas.drawRect(labelRect, labelBackgroundPaint)
-
-        // 라벨 텍스트 그리기
         canvas.drawText(label, leftPx + 5f, topPx - 5f, labelTextPaint)
 
         return bitmap
     }
+
+
 
     private fun checkPermission(): Boolean {
         Log.d("DEBUGLOG", "[MainActivity]checkPermission")
@@ -224,6 +233,7 @@ class MainActivity : AppCompatActivity() {
             ContextCompat.checkSelfPermission(baseContext, it) == PackageManager.PERMISSION_GRANTED
         }
     }
+
 
 
     override fun onDestroy() {

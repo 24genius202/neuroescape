@@ -89,13 +89,13 @@ object VibrationGuide {
         vib_amp = funx1
         vib_freq = funx0
 
-        Log.d("DEBUGLOG", "[UserGuide]updatevibrator | vib_freq: $vib_freq vib_amp: $vib_amp")
+        Log.d("DEBUGLOG", "[UserGuide]updatevibrator | vib_freq: $vib_freq, vib_amp: $vib_amp")
 
         intervalMs = (500L - (vib_freq * 500).toLong()).coerceAtLeast(10L)
         // 1 ~ 255
         amplitude = ((vib_amp * 255 + 120).toInt()).coerceIn(120, 255)
 
-        Log.d("DEBUGLOG", "[UserGuide]updatevibrator | intervalMs: $intervalMs amplitude: $amplitude")
+        Log.d("DEBUGLOG", "[UserGuide]updatevibrator | intervalMs: $intervalMs, amplitude: $amplitude")
 
         VibratorTimer.intervalMs = intervalMs
     }

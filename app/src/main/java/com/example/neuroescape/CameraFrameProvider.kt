@@ -26,14 +26,13 @@ class CameraFrameProvider(
     private var camera: Camera? = null
     private var windowtype = false
     private var isRotate: Boolean = true
-
     private var boxBitmap : Bitmap = createBitmap(1,1)
+
 
     @SuppressLint("UnsafeOptInUsageError")
     fun startCamera(imageView: ImageView, originalbutton: Button, cropbutton: Button) {
         Log.d("DEBUGLOG", "[CameraFrameProvider]startCamera")
         val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
-
 
         val delayMillis = 1000L
         originalbutton.postDelayed({
@@ -89,7 +88,7 @@ class CameraFrameProvider(
                     // ImageProxy -> Bitmap 변환
                     val bitmap = imageProxy.toBitmap()
 
-                    // UI 스레드에서 ImageView 업데이트
+                    // ImageView 업데이트
                     (context as? LifecycleOwner)?.let {
                         (imageView.context as? android.app.Activity)?.runOnUiThread {
                             imageView.setBackgroundColor(android.graphics.Color.BLACK)
@@ -97,6 +96,7 @@ class CameraFrameProvider(
                             val parent = imageView.parent as FrameLayout
                             val layoutParams = imageView.layoutParams
 
+                            // original frame
                             if (windowtype) {
                                 val rotation = imageProxy.imageInfo.rotationDegrees.toFloat()
                                 if (!isRotate) {
@@ -137,6 +137,7 @@ class CameraFrameProvider(
                                 imageView.setImageBitmap(bitmap)
 
                             }
+                            // detect frame
                             else {
                                 if (isRotate) {
                                     // boxBitmap: 회전 적용 X
@@ -170,6 +171,7 @@ class CameraFrameProvider(
             }
         }, ContextCompat.getMainExecutor(context))
     }
+
 
 
     fun shutdown() {

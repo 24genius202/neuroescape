@@ -2,7 +2,6 @@ package com.example.neuroescape
 
 import android.graphics.Bitmap
 
-//클래스 선언
 data class Detection(
     val classId: Int,
     val confidence: Float,
@@ -10,8 +9,8 @@ data class Detection(
 )
 
 data class Box(
-    val x: Float,     // top-left x (normalized 0~1)
-    val y: Float,     // top-left y
+    val x: Float,
+    val y: Float,
     val width: Float,
     val height: Float
 )
